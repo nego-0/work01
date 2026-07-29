@@ -11,7 +11,8 @@ Publicada no GitHub Pages: **https://nego-0.github.io/work01/**
 
 Para activar (uma vez): *Settings → Pages → Source: **GitHub Actions***. O workflow
 [`.github/workflows/pages.yml`](.github/workflows/pages.yml) publica o site a cada
-`push` para `main`.
+`push` para `main` ou para um ramo `claude/**`, e pode ser lançado à mão em
+*Actions → Publicar no GitHub Pages → Run workflow*.
 
 Também funciona a partir de qualquer servidor estático — basta servir a pasta do
 repositório (os módulos ES não funcionam com `file://`):
