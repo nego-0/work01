@@ -1,0 +1,15 @@
+{
+  "name": "gerador-relatorios-excel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Gerador web de relatórios Excel a partir de PDFs Document List",
+  "scripts": {
+    "start": "npx --yes http-server -p 8080 -c-1 .",
+    "cli": "node tools/gerar-cli.mjs"
+  },
+  "devDependencies": {
+    "exceljs": "^4.4.0",
+    "pdfjs-dist": "^6.2.0"
+  }
+}

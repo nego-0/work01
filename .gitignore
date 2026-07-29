@@ -1,0 +1,5 @@
+node_modules/
+saida/
+*.xlsx
+.testpdfs/
+.DS_Store

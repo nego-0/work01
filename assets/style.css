@@ -1,0 +1,165 @@
+:root {
+  --azul: #1f4e79;
+  --azul-claro: #2e75b6;
+  --fundo: #f4f6fa;
+  --cartao: #ffffff;
+  --texto: #1c2530;
+  --texto-suave: #5a6572;
+  --borda: #dde3ec;
+  --amarelo: #fff2cc;
+  --verde: #1e7d45;
+  --vermelho: #b3261e;
+  --raio: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  background: var(--fundo);
+  color: var(--texto);
+  line-height: 1.55;
+}
+
+.wrap { max-width: 900px; margin: 0 auto; padding: 0 20px; }
+
+/* Cabeçalho ------------------------------------------------------- */
+.topo {
+  background: linear-gradient(135deg, var(--azul), var(--azul-claro));
+  color: #fff;
+  padding: 32px 0 28px;
+}
+.topo h1 { margin: 0 0 8px; font-size: 1.7rem; }
+.topo p { margin: 0 0 6px; opacity: .95; }
+.topo .nota { font-size: .85rem; opacity: .8; }
+
+/* Cartões --------------------------------------------------------- */
+main { padding: 24px 0 40px; }
+
+.cartao {
+  background: var(--cartao);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 20px 22px;
+  margin-bottom: 20px;
+}
+.cartao h2 { margin: 0 0 14px; font-size: 1.15rem; display: flex; align-items: center; gap: 10px; }
+.cartao h3 { margin: 22px 0 6px; font-size: 1rem; }
+
+.passo {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--azul); color: #fff; font-size: .85rem; flex: none;
+}
+.opcional { font-weight: 400; color: var(--texto-suave); font-size: .85rem; }
+.nota { color: var(--texto-suave); font-size: .85rem; }
+code { background: #eef1f6; padding: 1px 5px; border-radius: 4px; font-size: .85em; }
+
+/* Zona de largada ------------------------------------------------- */
+.zona-larga {
+  border: 2px dashed var(--azul-claro);
+  border-radius: var(--raio);
+  padding: 26px 18px;
+  text-align: center;
+  cursor: pointer;
+  background: #fbfdff;
+  transition: background .15s, border-color .15s;
+}
+.zona-larga:hover, .zona-larga.activa, .zona-larga:focus-visible {
+  background: #eef5fd; border-color: var(--azul); outline: none;
+}
+.zona-larga p { margin: 4px 0; }
+.zona-icone { font-size: 2rem; }
+
+/* Lista de ficheiros ---------------------------------------------- */
+.lista { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.ficheiro {
+  display: flex; align-items: center; gap: 12px;
+  border: 1px solid var(--borda); border-left: 4px solid var(--verde);
+  border-radius: 8px; padding: 10px 12px; background: #fdfefe;
+}
+.ficheiro.com-erro { border-left-color: var(--vermelho); background: #fff8f7; }
+.ficheiro-info { flex: 1; min-width: 0; }
+.ficheiro-nome { font-weight: 600; word-break: break-all; }
+.ficheiro-meta { color: var(--texto-suave); font-size: .85rem; }
+
+.btn-remover {
+  border: none; background: transparent; color: var(--texto-suave);
+  font-size: 1rem; cursor: pointer; padding: 4px 8px; border-radius: 6px;
+}
+.btn-remover:hover { background: #f0f2f6; color: var(--vermelho); }
+
+/* Formulário ------------------------------------------------------ */
+.grelha-config {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.campo { display: flex; flex-direction: column; gap: 4px; font-size: .9rem; }
+.campo > span { color: var(--texto-suave); }
+.campo-check { flex-direction: row; align-items: center; gap: 8px; }
+.campo-check span { color: var(--texto); }
+
+input[type="text"], input[type="number"] {
+  padding: 8px 10px; border: 1px solid var(--borda); border-radius: 7px;
+  font: inherit; font-size: .95rem; background: #fff; color: var(--texto);
+}
+input[type="text"]:focus, input[type="number"]:focus {
+  outline: 2px solid var(--azul-claro); outline-offset: -1px; border-color: var(--azul-claro);
+}
+
+.tabela-tecnicos { width: 100%; border-collapse: collapse; margin: 8px 0 12px; }
+.tabela-tecnicos th {
+  text-align: left; font-size: .8rem; color: var(--texto-suave);
+  font-weight: 600; padding: 4px 6px;
+}
+.tabela-tecnicos td { padding: 3px 6px; }
+.tabela-tecnicos td:nth-child(1) { width: 55%; }
+.tabela-tecnicos td:nth-child(3) { width: 40px; }
+.tabela-tecnicos input { width: 100%; background: var(--amarelo); }
+
+/* Botões ---------------------------------------------------------- */
+.acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.btn {
+  border: 1px solid var(--borda); background: #fff; color: var(--texto);
+  padding: 9px 16px; border-radius: 8px; font: inherit; font-weight: 600;
+  cursor: pointer; transition: filter .15s, background .15s;
+}
+.btn:hover:not(:disabled) { background: #f2f5fa; }
+.btn-principal { background: var(--azul); border-color: var(--azul); color: #fff; }
+.btn-principal:hover:not(:disabled) { filter: brightness(1.12); background: var(--azul); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-fantasma { background: transparent; color: var(--azul); border-color: transparent; padding-left: 0; }
+.btn-fantasma:hover { text-decoration: underline; background: transparent; }
+
+/* Progresso e mensagens ------------------------------------------- */
+.progresso { margin-top: 14px; }
+.barra { height: 8px; background: #e6ebf3; border-radius: 999px; overflow: hidden; }
+.barra-interior { height: 100%; width: 0; background: var(--azul-claro); transition: width .25s; }
+.progresso p { margin: 6px 0 0; font-size: .85rem; color: var(--texto-suave); }
+
+.aviso { border-radius: 8px; padding: 12px 14px; margin-top: 14px; font-size: .9rem; }
+.aviso p { margin: 0 0 6px; }
+.aviso ul { margin: 0; padding-left: 20px; }
+.aviso-info { background: #eef5fd; border: 1px solid #cfe1f7; }
+.aviso-erro { background: #fdeceb; border: 1px solid #f5c6c2; color: var(--vermelho); }
+
+/* Resultados ------------------------------------------------------ */
+.resultados { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.resultado {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border: 1px solid var(--borda); border-left: 4px solid var(--verde);
+  border-radius: 8px; padding: 10px 12px; background: #fbfffc;
+}
+.resultado-nome { font-weight: 600; }
+
+.ajuda ol { margin: 0; padding-left: 20px; }
+.ajuda li { margin-bottom: 4px; }
+
+.rodape { padding: 18px 0 28px; color: var(--texto-suave); font-size: .85rem; text-align: center; }
+.rodape a { color: var(--azul); }
+
+@media (max-width: 560px) {
+  .resultado { flex-direction: column; align-items: stretch; }
+  .topo h1 { font-size: 1.35rem; }
+}
