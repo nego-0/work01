@@ -118,9 +118,10 @@ nome do ficheiro, que os blocos têm dias consecutivos e que o Excel gerado cont
 exactamente os mesmos registos, nas colunas e ordem pedidas.
 
 Confirma ainda, PDF a PDF, que todas as linhas de cada ficheiro chegaram ao Excel
-(17 + 52 + 50 + 35 + 54 nos exemplos) e que não há linhas repetidas nem agregadas.
+(17 + 52 + 50 + 35 + 54 nos exemplos), que não há linhas repetidas nem agregadas, e
+que o bloco de estados e a lista pendente Pago / Não Pago estão no sítio.
 
-Nos 5 PDFs de exemplo (208 processos) passaram as 96 verificações, e o resultado foi
+Nos 5 PDFs de exemplo (208 processos) passaram as 108 verificações, e o resultado foi
 ainda confrontado, linha a linha, com uma extracção feita por um método totalmente
 diferente (leitura ao nível do caractere): **208/208 registos iguais**.
 
