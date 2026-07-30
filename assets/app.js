@@ -20,6 +20,31 @@ if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdf.worker.min.mjs', import.meta.url).href;
 }
 
+/**
+ * Técnicos que aparecem por omissão na área de configuração. Ficam guardados no
+ * navegador assim que forem alterados; o botão "Repor lista" traz esta de volta.
+ */
+const TECNICOS_PREDEFINIDOS = [
+  'Abednego Agostinho',
+  'Raquel Machado',
+  'Leopoldo Maiato',
+  'Ruth Contreiras',
+  'Gisela Antonio',
+  'Vania Chungo',
+  'Jeronimo dos Santos',
+  'Mario Massanga',
+  'Altair Pereira',
+  'Marcolino da Silva',
+  'Carolina Costa',
+  'Constancia Cortez',
+  'Felson Jorge',
+  'Alfredo Jose',
+  'Jesse Martins',
+  'Virgilio da Conceição',
+].map((nome) => ({ nome, tipo: '' }));
+
+const CHAVE_GUARDADA = 'gerador-relatorios:tecnicos';
+
 const $ = (id) => document.getElementById(id);
 const seleccionado = (nome) => document.querySelector(`input[name="${nome}"]:checked`).value;
 
@@ -244,7 +269,7 @@ function adicionarLinhaTecnico(nome = '', tipo = '') {
   const tdNome = document.createElement('td');
   const inNome = document.createElement('input');
   inNome.type = 'text';
-  inNome.placeholder = 'Ex.: João';
+  inNome.placeholder = 'Nome do técnico';
   inNome.value = nome;
   tdNome.appendChild(inNome);
 
@@ -259,17 +284,19 @@ function adicionarLinhaTecnico(nome = '', tipo = '') {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'btn-remover';
+  btn.title = 'Remover';
   btn.textContent = '✕';
-  btn.addEventListener('click', () => tr.remove());
+  btn.addEventListener('click', () => { tr.remove(); guardarTecnicos(); actualizarContagem(); });
   tdAcao.appendChild(btn);
+
+  for (const campo of [inNome, inTipo]) {
+    campo.addEventListener('input', () => { guardarTecnicos(); actualizarContagem(); });
+  }
 
   tr.append(tdNome, tdTipo, tdAcao);
   $('corpo-tecnicos').appendChild(tr);
+  return tr;
 }
-
-$('btn-add-tecnico').addEventListener('click', () => adicionarLinhaTecnico());
-adicionarLinhaTecnico();
-adicionarLinhaTecnico();
 
 function lerTecnicosDoFormulario() {
   return [...$('corpo-tecnicos').querySelectorAll('tr')]
@@ -279,6 +306,54 @@ function lerTecnicosDoFormulario() {
     })
     .filter((t) => t.nome);
 }
+
+function mostrarTecnicos(lista) {
+  $('corpo-tecnicos').innerHTML = '';
+  for (const t of lista) adicionarLinhaTecnico(t.nome, t.tipo || '');
+  if (!lista.length) adicionarLinhaTecnico();
+  actualizarContagem();
+}
+
+function actualizarContagem() {
+  const lista = lerTecnicosDoFormulario();
+  const comTipo = lista.filter((t) => t.tipo).length;
+  $('contagem-tecnicos').textContent = lista.length
+    ? `${lista.length} técnico(s) · ${comTipo} com tipo definido`
+    : 'nenhum técnico definido';
+}
+
+/** Guarda a lista no navegador, para não ser preciso reescrevê-la. */
+function guardarTecnicos() {
+  try {
+    localStorage.setItem(CHAVE_GUARDADA, JSON.stringify(lerTecnicosDoFormulario()));
+  } catch { /* sem armazenamento disponível — segue sem guardar */ }
+}
+
+function tecnicosGuardados() {
+  try {
+    const bruto = localStorage.getItem(CHAVE_GUARDADA);
+    const lista = bruto ? JSON.parse(bruto) : null;
+    if (Array.isArray(lista) && lista.length) {
+      return lista.filter((t) => t && typeof t.nome === 'string' && t.nome.trim());
+    }
+  } catch { /* valor inválido — usa a lista predefinida */ }
+  return null;
+}
+
+$('btn-add-tecnico').addEventListener('click', () => {
+  adicionarLinhaTecnico().querySelector('input').focus();
+  actualizarContagem();
+});
+$('btn-repor-tecnicos').addEventListener('click', () => {
+  mostrarTecnicos(TECNICOS_PREDEFINIDOS);
+  guardarTecnicos();
+});
+$('btn-limpar-tecnicos').addEventListener('click', () => {
+  mostrarTecnicos([]);
+  guardarTecnicos();
+});
+
+mostrarTecnicos(tecnicosGuardados() || TECNICOS_PREDEFINIDOS);
 
 /** Técnicos do formulário mais os que vierem dos relatórios carregados. */
 function tecnicosParaOsFicheiros() {

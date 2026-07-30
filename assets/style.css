@@ -108,7 +108,12 @@ input[type="text"]:focus, input[type="number"]:focus {
   outline: 2px solid var(--azul-claro); outline-offset: -1px; border-color: var(--azul-claro);
 }
 
-.tabela-tecnicos { width: 100%; border-collapse: collapse; margin: 8px 0 12px; }
+.tabela-scroll {
+  max-height: 320px; overflow-y: auto; margin: 8px 0 4px;
+  border: 1px solid var(--borda); border-radius: 8px; padding: 4px 8px;
+}
+.tabela-tecnicos { width: 100%; border-collapse: collapse; }
+.tabela-tecnicos thead th { position: sticky; top: 0; background: var(--cartao); }
 .tabela-tecnicos th {
   text-align: left; font-size: .8rem; color: var(--texto-suave);
   font-weight: 600; padding: 4px 6px;
@@ -117,6 +122,20 @@ input[type="text"]:focus, input[type="number"]:focus {
 .tabela-tecnicos td:nth-child(1) { width: 55%; }
 .tabela-tecnicos td:nth-child(3) { width: 40px; }
 .tabela-tecnicos input { width: 100%; background: var(--amarelo); }
+
+/* Opções (rádios) ------------------------------------------------- */
+.opcoes { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.opcao {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  border: 1px solid var(--borda); border-radius: 8px; padding: 10px 12px;
+  transition: border-color .15s, background .15s;
+}
+.opcao:hover { background: #f7f9fc; }
+.opcao:has(input:checked) { border-color: var(--azul-claro); background: #eef5fd; }
+.opcao input { margin-top: 3px; flex: none; }
+.opcao span { display: flex; flex-direction: column; }
+.opcao small { color: var(--texto-suave); font-size: .82rem; }
+.desactivada { opacity: .5; pointer-events: none; }
 
 /* Botões ---------------------------------------------------------- */
 .acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }

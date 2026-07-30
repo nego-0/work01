@@ -65,6 +65,20 @@ Manhã 21.07.2026.pdf      01.07.2026_Tarde.pdf      2026-07-23 Madrugada.pdf
 
 Se o nome não tiver data, é usada a data predominante dentro do próprio PDF.
 
+## Técnicos
+
+A aplicação já vem com a equipa preenchida — Abednego Agostinho, Raquel Machado,
+Leopoldo Maiato, Ruth Contreiras, Gisela Antonio, Vania Chungo, Jeronimo dos
+Santos, Mario Massanga, Altair Pereira, Marcolino da Silva, Carolina Costa,
+Constancia Cortez, Felson Jorge, Alfredo Jose, Jesse Martins e Virgilio da
+Conceição. Os nomes podem ser mudados, removidos ou acrescentados, e o **Tipo**
+de cada um pode ficar por definir.
+
+A lista fica guardada no navegador, por isso as alterações mantêm-se de uma
+utilização para a outra; o botão *Repor lista predefinida* traz a original de
+volta. Estes nomes vão para a área de configuração de cada Excel e alimentam a
+lista pendente da coluna Técnico.
+
 ## Origem dos dados
 
 | Origem | Para quê |
@@ -109,10 +123,10 @@ A folha **Relatório** tem as estatísticas no topo e os dados por baixo:
    É a **única parte congelada** da folha, por isso acompanha sempre a leitura da
    tabela. As colunas de tipo são preenchidas sozinhas com os tipos distintos
    definidos nos técnicos, e *Outros tipos* garante que nada fica por contar.
-2. **Técnicos** — a área editável (células amarelas) onde se escreve o nome do
-   técnico e o tipo correspondente, com o nº de processos e o total das taxas de
-   cada um. As linhas estão repartidas em **duas metades lado a lado** (por
-   omissão 6 + 6). Rola com a folha.
+2. **Técnicos** — a área editável (células amarelas) com o nome do técnico e o
+   tipo correspondente, mais o nº de processos e o total das taxas de cada um. As
+   linhas estão repartidas em **duas metades lado a lado** (8 + 8 com a lista
+   predefinida). Rola com a folha.
 3. **Dados** — uma linha por processo, com as 7 colunas mais a coluna de origem
    e filtro automático. Rola com a folha.
 

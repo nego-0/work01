@@ -116,7 +116,12 @@ input[type="text"]:focus, input[type="number"]:focus {
   outline: 2px solid var(--azul-claro); outline-offset: -1px; border-color: var(--azul-claro);
 }
 
-.tabela-tecnicos { width: 100%; border-collapse: collapse; margin: 8px 0 12px; }
+.tabela-scroll {
+  max-height: 320px; overflow-y: auto; margin: 8px 0 4px;
+  border: 1px solid var(--borda); border-radius: 8px; padding: 4px 8px;
+}
+.tabela-tecnicos { width: 100%; border-collapse: collapse; }
+.tabela-tecnicos thead th { position: sticky; top: 0; background: var(--cartao); }
 .tabela-tecnicos th {
   text-align: left; font-size: .8rem; color: var(--texto-suave);
   font-weight: 600; padding: 4px 6px;
@@ -125,6 +130,20 @@ input[type="text"]:focus, input[type="number"]:focus {
 .tabela-tecnicos td:nth-child(1) { width: 55%; }
 .tabela-tecnicos td:nth-child(3) { width: 40px; }
 .tabela-tecnicos input { width: 100%; background: var(--amarelo); }
+
+/* Opções (rádios) ------------------------------------------------- */
+.opcoes { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.opcao {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  border: 1px solid var(--borda); border-radius: 8px; padding: 10px 12px;
+  transition: border-color .15s, background .15s;
+}
+.opcao:hover { background: #f7f9fc; }
+.opcao:has(input:checked) { border-color: var(--azul-claro); background: #eef5fd; }
+.opcao input { margin-top: 3px; flex: none; }
+.opcao span { display: flex; flex-direction: column; }
+.opcao small { color: var(--texto-suave); font-size: .82rem; }
+.desactivada { opacity: .5; pointer-events: none; }
 
 /* Botões ---------------------------------------------------------- */
 .acoes { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
@@ -267,22 +286,29 @@ input[type="text"]:focus, input[type="number"]:focus {
       </label>
       <label class="campo">
         <span>Linhas de técnicos (metade de cada lado)</span>
-        <input type="number" id="linhas-tecnicos" value="12" min="2" max="200" step="2">
+        <input type="number" id="linhas-tecnicos" value="16" min="2" max="200" step="2">
       </label>
     </div>
 
-    <h3>Técnicos [6] → Tipo [7] <span class="opcional">(opcional)</span></h3>
+    <h3>Técnicos [6] → Tipo [7] <span class="opcional" id="contagem-tecnicos"></span></h3>
     <p class="nota">
-      Estes pares são escritos na área de configuração de cada Excel. Pode deixar vazio e preencher
-      directamente no Excel — a coluna <strong>Tipo</strong> dos dados é calculada por fórmula a partir
-      do técnico escolhido, e as estatísticas actualizam-se automaticamente. Quando a origem são
-      relatórios já preenchidos, os técnicos deles são aproveitados.
+      Estes nomes vão para a área de configuração de cada Excel gerado e ficam disponíveis na lista
+      pendente da coluna <strong>Técnico</strong>. O <strong>Tipo</strong> pode ser deixado em branco e
+      definido mais tarde no Excel — a coluna Tipo dos dados é calculada por fórmula a partir do técnico
+      escolhido. A lista fica guardada neste navegador; quando a origem são relatórios já preenchidos,
+      os técnicos deles também são aproveitados.
     </p>
-    <table class="tabela-tecnicos">
-      <thead><tr><th>Técnico [6]</th><th>Tipo [7]</th><th></th></tr></thead>
-      <tbody id="corpo-tecnicos"></tbody>
-    </table>
-    <button type="button" class="btn btn-fantasma" id="btn-add-tecnico">+ Adicionar técnico</button>
+    <div class="tabela-scroll">
+      <table class="tabela-tecnicos">
+        <thead><tr><th>Técnico [6]</th><th>Tipo [7]</th><th></th></tr></thead>
+        <tbody id="corpo-tecnicos"></tbody>
+      </table>
+    </div>
+    <div class="acoes">
+      <button type="button" class="btn btn-fantasma" id="btn-add-tecnico">+ Adicionar técnico</button>
+      <button type="button" class="btn btn-fantasma" id="btn-repor-tecnicos">↺ Repor lista predefinida</button>
+      <button type="button" class="btn btn-fantasma" id="btn-limpar-tecnicos">Limpar lista</button>
+    </div>
   </section>
 
   <!-- 4. Gerar ------------------------------------------------------ -->
@@ -947,7 +973,7 @@ function construirFolhaRelatorio(ws, params) {
   /* ---- Colunas ---------------------------------------------------- */
   // As 8 primeiras servem a tabela de dados; as seguintes só o resumo.
   const nColResumo = 1 + 1 + periodos.length + 2 + estados.length + nTipos + 1;
-  const larguras = [22, 14, 18, 14, 14, 20, 16, 22];
+  const larguras = [24, 14, 18, 14, 14, 24, 16, 22];
   while (larguras.length < nColResumo) larguras.push(13);
   ws.columns = [
     ...larguras.map((width) => ({ width })),
@@ -1482,6 +1508,31 @@ if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdf.worker.min.mjs', import.meta.url).href;
 }
 
+/**
+ * Técnicos que aparecem por omissão na área de configuração. Ficam guardados no
+ * navegador assim que forem alterados; o botão "Repor lista" traz esta de volta.
+ */
+const TECNICOS_PREDEFINIDOS = [
+  'Abednego Agostinho',
+  'Raquel Machado',
+  'Leopoldo Maiato',
+  'Ruth Contreiras',
+  'Gisela Antonio',
+  'Vania Chungo',
+  'Jeronimo dos Santos',
+  'Mario Massanga',
+  'Altair Pereira',
+  'Marcolino da Silva',
+  'Carolina Costa',
+  'Constancia Cortez',
+  'Felson Jorge',
+  'Alfredo Jose',
+  'Jesse Martins',
+  'Virgilio da Conceição',
+].map((nome) => ({ nome, tipo: '' }));
+
+const CHAVE_GUARDADA = 'gerador-relatorios:tecnicos';
+
 const $ = (id) => document.getElementById(id);
 const seleccionado = (nome) => document.querySelector(`input[name="${nome}"]:checked`).value;
 
@@ -1706,7 +1757,7 @@ function adicionarLinhaTecnico(nome = '', tipo = '') {
   const tdNome = document.createElement('td');
   const inNome = document.createElement('input');
   inNome.type = 'text';
-  inNome.placeholder = 'Ex.: João';
+  inNome.placeholder = 'Nome do técnico';
   inNome.value = nome;
   tdNome.appendChild(inNome);
 
@@ -1721,17 +1772,19 @@ function adicionarLinhaTecnico(nome = '', tipo = '') {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'btn-remover';
+  btn.title = 'Remover';
   btn.textContent = '✕';
-  btn.addEventListener('click', () => tr.remove());
+  btn.addEventListener('click', () => { tr.remove(); guardarTecnicos(); actualizarContagem(); });
   tdAcao.appendChild(btn);
+
+  for (const campo of [inNome, inTipo]) {
+    campo.addEventListener('input', () => { guardarTecnicos(); actualizarContagem(); });
+  }
 
   tr.append(tdNome, tdTipo, tdAcao);
   $('corpo-tecnicos').appendChild(tr);
+  return tr;
 }
-
-$('btn-add-tecnico').addEventListener('click', () => adicionarLinhaTecnico());
-adicionarLinhaTecnico();
-adicionarLinhaTecnico();
 
 function lerTecnicosDoFormulario() {
   return [...$('corpo-tecnicos').querySelectorAll('tr')]
@@ -1741,6 +1794,54 @@ function lerTecnicosDoFormulario() {
     })
     .filter((t) => t.nome);
 }
+
+function mostrarTecnicos(lista) {
+  $('corpo-tecnicos').innerHTML = '';
+  for (const t of lista) adicionarLinhaTecnico(t.nome, t.tipo || '');
+  if (!lista.length) adicionarLinhaTecnico();
+  actualizarContagem();
+}
+
+function actualizarContagem() {
+  const lista = lerTecnicosDoFormulario();
+  const comTipo = lista.filter((t) => t.tipo).length;
+  $('contagem-tecnicos').textContent = lista.length
+    ? `${lista.length} técnico(s) · ${comTipo} com tipo definido`
+    : 'nenhum técnico definido';
+}
+
+/** Guarda a lista no navegador, para não ser preciso reescrevê-la. */
+function guardarTecnicos() {
+  try {
+    localStorage.setItem(CHAVE_GUARDADA, JSON.stringify(lerTecnicosDoFormulario()));
+  } catch { /* sem armazenamento disponível — segue sem guardar */ }
+}
+
+function tecnicosGuardados() {
+  try {
+    const bruto = localStorage.getItem(CHAVE_GUARDADA);
+    const lista = bruto ? JSON.parse(bruto) : null;
+    if (Array.isArray(lista) && lista.length) {
+      return lista.filter((t) => t && typeof t.nome === 'string' && t.nome.trim());
+    }
+  } catch { /* valor inválido — usa a lista predefinida */ }
+  return null;
+}
+
+$('btn-add-tecnico').addEventListener('click', () => {
+  adicionarLinhaTecnico().querySelector('input').focus();
+  actualizarContagem();
+});
+$('btn-repor-tecnicos').addEventListener('click', () => {
+  mostrarTecnicos(TECNICOS_PREDEFINIDOS);
+  guardarTecnicos();
+});
+$('btn-limpar-tecnicos').addEventListener('click', () => {
+  mostrarTecnicos([]);
+  guardarTecnicos();
+});
+
+mostrarTecnicos(tecnicosGuardados() || TECNICOS_PREDEFINIDOS);
 
 /** Técnicos do formulário mais os que vierem dos relatórios carregados. */
 function tecnicosParaOsFicheiros() {

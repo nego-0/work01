@@ -169,7 +169,7 @@ function construirFolhaRelatorio(ws, params) {
   /* ---- Colunas ---------------------------------------------------- */
   // As 8 primeiras servem a tabela de dados; as seguintes só o resumo.
   const nColResumo = 1 + 1 + periodos.length + 2 + estados.length + nTipos + 1;
-  const larguras = [22, 14, 18, 14, 14, 20, 16, 22];
+  const larguras = [24, 14, 18, 14, 14, 24, 16, 22];
   while (larguras.length < nColResumo) larguras.push(13);
   ws.columns = [
     ...larguras.map((width) => ({ width })),

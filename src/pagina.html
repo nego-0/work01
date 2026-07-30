@@ -102,22 +102,29 @@
       </label>
       <label class="campo">
         <span>Linhas de técnicos (metade de cada lado)</span>
-        <input type="number" id="linhas-tecnicos" value="12" min="2" max="200" step="2">
+        <input type="number" id="linhas-tecnicos" value="16" min="2" max="200" step="2">
       </label>
     </div>
 
-    <h3>Técnicos [6] → Tipo [7] <span class="opcional">(opcional)</span></h3>
+    <h3>Técnicos [6] → Tipo [7] <span class="opcional" id="contagem-tecnicos"></span></h3>
     <p class="nota">
-      Estes pares são escritos na área de configuração de cada Excel. Pode deixar vazio e preencher
-      directamente no Excel — a coluna <strong>Tipo</strong> dos dados é calculada por fórmula a partir
-      do técnico escolhido, e as estatísticas actualizam-se automaticamente. Quando a origem são
-      relatórios já preenchidos, os técnicos deles são aproveitados.
+      Estes nomes vão para a área de configuração de cada Excel gerado e ficam disponíveis na lista
+      pendente da coluna <strong>Técnico</strong>. O <strong>Tipo</strong> pode ser deixado em branco e
+      definido mais tarde no Excel — a coluna Tipo dos dados é calculada por fórmula a partir do técnico
+      escolhido. A lista fica guardada neste navegador; quando a origem são relatórios já preenchidos,
+      os técnicos deles também são aproveitados.
     </p>
-    <table class="tabela-tecnicos">
-      <thead><tr><th>Técnico [6]</th><th>Tipo [7]</th><th></th></tr></thead>
-      <tbody id="corpo-tecnicos"></tbody>
-    </table>
-    <button type="button" class="btn btn-fantasma" id="btn-add-tecnico">+ Adicionar técnico</button>
+    <div class="tabela-scroll">
+      <table class="tabela-tecnicos">
+        <thead><tr><th>Técnico [6]</th><th>Tipo [7]</th><th></th></tr></thead>
+        <tbody id="corpo-tecnicos"></tbody>
+      </table>
+    </div>
+    <div class="acoes">
+      <button type="button" class="btn btn-fantasma" id="btn-add-tecnico">+ Adicionar técnico</button>
+      <button type="button" class="btn btn-fantasma" id="btn-repor-tecnicos">↺ Repor lista predefinida</button>
+      <button type="button" class="btn btn-fantasma" id="btn-limpar-tecnicos">Limpar lista</button>
+    </div>
   </section>
 
   <!-- 4. Gerar ------------------------------------------------------ -->
