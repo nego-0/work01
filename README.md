@@ -85,10 +85,35 @@ lista pendente da coluna Técnico.
 |---|---|
 | **Ficheiros PDF** | o caso normal: extrair os processos dos *Document List* |
 | **Relatórios Excel já preenchidos** | juntar relatórios que já levam os técnicos e os estados indicados, sem voltar aos PDFs e sem perder o que foi preenchido |
+| **Acrescentar a um consolidado existente** | pegar num consolidado já gerado e juntar-lhe novos relatórios |
 
-Na segunda opção, os técnicos, os tipos e os estados são lidos de cada relatório e
-mantidos no consolidado; os mapas Técnico → Tipo dos vários ficheiros são juntos
-num só.
+Nas duas últimas, os técnicos, os tipos e os estados são lidos de cada ficheiro e
+mantidos; os mapas Técnico → Tipo dos vários relatórios são juntos num só. Na
+terceira, o consolidado existente é escolhido à parte — é ele que serve de base, e
+os outros relatórios juntam-se-lhe.
+
+### Repetições
+
+Ao juntar relatórios, o mesmo processo pode vir em mais do que um ficheiro. Dois
+processos são o mesmo quando têm o **mesmo Nº do DU na mesma Data de Reg.** —
+cada um entra uma só vez, na posição em que apareceu primeiro.
+
+Qual das versões fica é escolhido antes de gerar:
+
+| Política | Fica |
+|---|---|
+| **A versão mais preenchida** (por omissão) | a que tiver técnico, tipo e estado indicados; em caso de empate, a que já estava |
+| **A que já estava** | o consolidado existente (ou o primeiro relatório carregado) |
+| **A que está a ser acrescentada** | os relatórios novos substituem o que lá estava |
+
+Antes de gerar, a aplicação mostra quantas repetições encontrou e quantas trazem
+dados diferentes. O ficheiro sai com uma folha **Redundâncias** que lista, uma a
+uma, o Nº do DU, a data, se os dados coincidiam, e as duas versões lado a lado —
+a mantida e a posta de lado, cada uma com o relatório de onde veio, o técnico, o
+estado e o total.
+
+O ficheiro gerado por esta via chama-se `Relatorio_Consolidado_Actualizado.xlsx`,
+para não se confundir com o original.
 
 ## O que gerar
 
@@ -129,6 +154,9 @@ A folha **Relatório** tem as estatísticas no topo e os dados por baixo:
    predefinida). Rola com a folha.
 3. **Dados** — uma linha por processo, com as 7 colunas mais a coluna de origem
    e filtro automático. Rola com a folha.
+
+Há ainda a folha **Ficheiros de Origem** e, quando a junção encontrou processos
+repetidos, a folha **Redundâncias**.
 
 Tudo assenta em fórmulas nativas: basta escolher o técnico numa linha de dados
 (há lista pendente) para o **Tipo** ser preenchido automaticamente e todas as
@@ -171,7 +199,11 @@ Verifica ainda a ida e volta: pega num relatório gerado, preenche os técnicos 
 estados, relê-o com o mesmo leitor que a aplicação usa e confirma que nada se
 perde — linhas, ordem, técnicos, tipos, estados e totais.
 
-Nos 5 PDFs de exemplo (208 processos) passaram as 168 verificações, e o resultado foi
+Cobre também a junção: relatórios repetidos não duplicam linhas, cada política
+mantém a versão certa, a ordem das fontes é respeitada e o mesmo Nº do DU noutra
+data conta como outro processo.
+
+Nos 5 PDFs de exemplo (208 processos) passaram as 179 verificações, e o resultado foi
 ainda confrontado, linha a linha, com uma extracção feita por um método totalmente
 diferente (leitura ao nível do caractere): **208/208 registos iguais**.
 

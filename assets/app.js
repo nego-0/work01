@@ -12,7 +12,7 @@ import {
   formatDatePt,
 } from './parser.js';
 import { criarWorkbook } from './report.js';
-import { lerRelatorio, juntarTecnicos } from './leitor-relatorio.js';
+import { lerRelatorio, juntarTecnicos, juntarRegistos, POLITICAS } from './leitor-relatorio.js';
 
 if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc
     && typeof globalThis.pdfjsWorker === 'undefined') {
@@ -49,10 +49,14 @@ const $ = (id) => document.getElementById(id);
 const seleccionado = (nome) => document.querySelector(`input[name="${nome}"]:checked`).value;
 
 const estado = {
-  fonte: 'pdf',    // 'pdf' | 'relatorio'
+  fonte: 'pdf',    // 'pdf' | 'relatorio' | 'acrescentar'
+  base: null,      // consolidado a acrescer, quando a fonte é 'acrescentar'
   ficheiros: [],   // { id, nome, periodo, dataIso, file, registos, tecnicos, erro }
   gerados: [],     // { nome, blob, grupo }
 };
+
+/** As fontes que não são PDF juntam relatórios e verificam redundâncias. */
+const juntaRelatorios = () => estado.fonte !== 'pdf';
 
 /* ------------------------------------------------------------------ */
 /* Origem                                                              */
@@ -68,6 +72,7 @@ function extensaoAceite() {
 function aplicarFonte() {
   estado.fonte = seleccionado('fonte');
   const ehPdf = estado.fonte === 'pdf';
+  const ehAcrescentar = estado.fonte === 'acrescentar';
 
   inputFicheiros.accept = ehPdf ? 'application/pdf,.pdf' : '.xlsx';
   $('zona-nota').innerHTML = ehPdf
@@ -76,6 +81,9 @@ function aplicarFonte() {
     : 'Relatórios <code>.xlsx</code> gerados por esta aplicação. Os técnicos e os estados que '
       + 'lá estiverem preenchidos são mantidos.';
 
+  $('area-base').hidden = !ehAcrescentar;
+  $('area-politica').hidden = ehPdf;
+
   // A partir de relatórios só faz sentido consolidar.
   for (const radio of document.querySelectorAll('input[name="modo"]')) {
     radio.disabled = !ehPdf;
@@ -83,8 +91,12 @@ function aplicarFonte() {
   }
   document.querySelectorAll('input[name="modo"]')[0].closest('.opcoes')
     .classList.toggle('desactivada', !ehPdf);
+  $('gerar-consolidado').disabled = !ehPdf;
+  $('campo-consolidado').classList.toggle('desactivada', !ehPdf);
 
   estado.ficheiros = [];
+  estado.base = null;
+  desenharBase();
   desenharFicheiros();
 }
 
@@ -115,6 +127,76 @@ $('btn-limpar').addEventListener('click', () => {
   estado.ficheiros = [];
   desenharFicheiros();
 });
+
+/* ---- Consolidado a acrescer -------------------------------------- */
+
+const zonaBase = $('zona-base');
+const inputBase = $('input-base');
+
+zonaBase.addEventListener('click', () => inputBase.click());
+zonaBase.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputBase.click(); }
+});
+inputBase.addEventListener('change', () => {
+  definirBase(inputBase.files[0]);
+  inputBase.value = '';
+});
+for (const ev of ['dragenter', 'dragover']) {
+  zonaBase.addEventListener(ev, (e) => { e.preventDefault(); zonaBase.classList.add('activa'); });
+}
+for (const ev of ['dragleave', 'drop']) {
+  zonaBase.addEventListener(ev, (e) => { e.preventDefault(); zonaBase.classList.remove('activa'); });
+}
+zonaBase.addEventListener('drop', (e) => definirBase((e.dataTransfer?.files || [])[0]));
+
+async function definirBase(file) {
+  if (!file || !/\.xlsx$/i.test(file.name)) return;
+  const item = {
+    id: `base${++contador}`, nome: file.name, file,
+    registos: null, tecnicos: [], erro: null, aLer: true, ehBase: true,
+  };
+  estado.base = item;
+  desenharBase();
+  await lerRelatorioExcel(item);
+  desenharBase();
+  desenharFicheiros();
+}
+
+function desenharBase() {
+  const alvo = $('info-base');
+  alvo.innerHTML = '';
+  const b = estado.base;
+  alvo.hidden = !b;
+  if (!b) return;
+
+  const div = document.createElement('div');
+  div.className = 'ficheiro' + (b.erro ? ' com-erro' : '');
+  const info = document.createElement('div');
+  info.className = 'ficheiro-info';
+  info.innerHTML = `<div class="ficheiro-nome">📗 ${b.nome}</div>`;
+  const meta = document.createElement('div');
+  meta.className = 'ficheiro-meta';
+  meta.textContent = b.aLer ? 'A ler…'
+    : b.erro ? b.erro
+      : `${b.registos.length} registo(s) · `
+        + `${b.registos.filter((r) => r.tecnico).length} com técnico · `
+        + `${b.tecnicos.length} técnico(s) no mapa`;
+  info.appendChild(meta);
+
+  const remover = document.createElement('button');
+  remover.type = 'button';
+  remover.className = 'btn-remover';
+  remover.title = 'Remover';
+  remover.textContent = '✕';
+  remover.addEventListener('click', () => {
+    estado.base = null;
+    desenharBase();
+    desenharFicheiros();
+  });
+
+  div.append(info, remover);
+  alvo.appendChild(div);
+}
 
 let contador = 0;
 
@@ -255,7 +337,9 @@ function desenharFicheiros() {
     lista.appendChild(div);
   }
 
-  $('btn-gerar').disabled = !estado.ficheiros.some((f) => f.registos && f.registos.length);
+  const temDados = estado.ficheiros.some((f) => f.registos && f.registos.length)
+    || (estado.base && estado.base.registos && estado.base.registos.length);
+  $('btn-gerar').disabled = !temDados;
   mostrarPrevisao();
 }
 
@@ -358,7 +442,8 @@ mostrarTecnicos(tecnicosGuardados() || TECNICOS_PREDEFINIDOS);
 /** Técnicos do formulário mais os que vierem dos relatórios carregados. */
 function tecnicosParaOsFicheiros() {
   const doFormulario = lerTecnicosDoFormulario();
-  const dosRelatorios = juntarTecnicos(estado.ficheiros.filter((f) => f.tecnicos?.length));
+  const comMapa = [estado.base, ...estado.ficheiros].filter((f) => f && f.tecnicos?.length);
+  const dosRelatorios = juntarTecnicos(comMapa);
   const juntos = [...doFormulario];
   const vistos = new Set(doFormulario.map((t) => t.nome.toLowerCase()));
   for (const t of dosRelatorios) {
@@ -390,32 +475,76 @@ function calcularGrupos() {
 }
 
 function querConsolidado() {
-  return seleccionado('modo') === 'consolidado' || $('gerar-consolidado').checked;
+  return juntaRelatorios() || seleccionado('modo') === 'consolidado' || $('gerar-consolidado').checked;
+}
+
+/** Todos os relatórios em jogo, com o consolidado base à cabeça. */
+function fontesParaJuntar() {
+  const lista = [];
+  if (estado.base && estado.base.registos?.length) {
+    lista.push({ origem: estado.base.nome, registos: estado.base.registos, ehBase: true });
+  }
+  for (const f of ficheirosValidos()) lista.push({ origem: f.nome, registos: f.registos });
+  return lista;
+}
+
+/** Junta tudo e resolve as repetições segundo a política escolhida. */
+function juntarTudo() {
+  return juntarRegistos(fontesParaJuntar(), seleccionado('politica'));
+}
+
+function nomeDoConsolidado() {
+  return estado.fonte === 'acrescentar' ? 'Relatorio_Consolidado_Actualizado' : 'Relatorio_Consolidado';
 }
 
 function mostrarPrevisao() {
   const alvo = $('mensagens');
   alvo.innerHTML = '';
   const validos = ficheirosValidos();
-  if (!validos.length) return;
+  const temBase = !!(estado.base && estado.base.registos?.length);
+  if (!validos.length && !temBase) return;
 
-  const grupos = calcularGrupos();
-  const linhas = grupos.map((g) => {
-    const n = g.ficheiros.reduce((a, f) => a + f.registos.length, 0);
-    return `<li><strong>${g.nomeFicheiro}.xlsx</strong> — ${g.rotulo} · `
-      + `${g.ficheiros.length} ficheiro(s) · ${n} registo(s)</li>`;
-  });
-  if (querConsolidado()) {
-    const n = validos.reduce((a, f) => a + f.registos.length, 0);
-    linhas.push(`<li><strong>Relatorio_Consolidado.xlsx</strong> — tudo · ${n} registo(s)</li>`);
+  const caixas = [];
+
+  if (juntaRelatorios()) {
+    const fontes = fontesParaJuntar();
+    const { registos, duplicados } = juntarTudo();
+    const somaBruta = fontes.reduce((a, f) => a + f.registos.length, 0);
+    const diferentes = duplicados.filter((d) => !d.iguais).length;
+
+    const caixa = document.createElement('div');
+    caixa.className = 'aviso aviso-info';
+    caixa.innerHTML = `<p>Será gerado <strong>${nomeDoConsolidado()}.xlsx</strong> com `
+      + `<strong>${registos.length}</strong> processo(s), a partir de ${fontes.length} `
+      + `relatório(s) (${somaBruta} linhas ao todo).</p>`
+      + (duplicados.length
+        ? `<ul><li><strong>${duplicados.length}</strong> repetição(ões) encontrada(s) — `
+          + `${duplicados.length - diferentes} com dados iguais, `
+          + `<strong>${diferentes}</strong> com dados diferentes.</li>`
+          + `<li>Em cada uma fica ${POLITICAS[seleccionado('politica')]}; `
+          + 'as outras versões vão para a folha <em>Redundâncias</em>.</li></ul>'
+        : '<ul><li>Nenhuma repetição encontrada.</li></ul>');
+    caixas.push(caixa);
+  } else {
+    const grupos = calcularGrupos();
+    const linhas = grupos.map((g) => {
+      const n = g.ficheiros.reduce((a, f) => a + f.registos.length, 0);
+      return `<li><strong>${g.nomeFicheiro}.xlsx</strong> — ${g.rotulo} · `
+        + `${g.ficheiros.length} ficheiro(s) · ${n} registo(s)</li>`;
+    });
+    if (querConsolidado()) {
+      const n = validos.reduce((a, f) => a + f.registos.length, 0);
+      linhas.push(`<li><strong>Relatorio_Consolidado.xlsx</strong> — tudo · ${n} registo(s)</li>`);
+    }
+    if (!linhas.length) return;
+    const caixa = document.createElement('div');
+    caixa.className = 'aviso aviso-info';
+    caixa.innerHTML = `<p>Serão gerados <strong>${linhas.length}</strong> ficheiro(s) Excel:</p>`
+      + `<ul>${linhas.join('')}</ul>`;
+    caixas.push(caixa);
   }
-  if (!linhas.length) return;
 
-  const box = document.createElement('div');
-  box.className = 'aviso aviso-info';
-  box.innerHTML = `<p>Serão gerados <strong>${linhas.length}</strong> ficheiro(s) Excel:</p>`
-    + `<ul>${linhas.join('')}</ul>`;
-  alvo.appendChild(box);
+  for (const c of caixas) alvo.appendChild(c);
 }
 
 for (const radio of document.querySelectorAll('input[name="modo"]')) {
@@ -428,6 +557,9 @@ for (const radio of document.querySelectorAll('input[name="modo"]')) {
   });
 }
 $('gerar-consolidado').addEventListener('change', mostrarPrevisao);
+for (const radio of document.querySelectorAll('input[name="politica"]')) {
+  radio.addEventListener('change', mostrarPrevisao);
+}
 
 /* ------------------------------------------------------------------ */
 /* Geração                                                             */
@@ -469,11 +601,28 @@ async function gerar() {
     }
 
     if (consolidar) {
-      progresso(feito, total, 'A gerar Relatorio_Consolidado.xlsx…');
+      const nome = `${nomeDoConsolidado()}.xlsx`;
+      progresso(feito, total, `A gerar ${nome}…`);
       await new Promise((r) => setTimeout(r, 0));
-      const todos = { rotulo: 'Consolidado', ficheiros: ficheirosValidos() };
-      const buffer = await criarWorkbook(window.ExcelJS, todos, { ...opcoes, consolidado: true });
-      estado.gerados.push({ nome: 'Relatorio_Consolidado.xlsx', blob: paraBlob(buffer), grupo: todos });
+
+      const usados = juntaRelatorios() && estado.base
+        ? [estado.base, ...ficheirosValidos()]
+        : ficheirosValidos();
+      const todos = { rotulo: 'Consolidado', ficheiros: usados };
+
+      // Ao juntar relatórios, as linhas passam pela verificação de redundâncias.
+      const extra = {};
+      if (juntaRelatorios()) {
+        const politica = seleccionado('politica');
+        const { registos, duplicados } = juntarTudo();
+        extra.registos = registos;
+        extra.duplicados = duplicados;
+        extra.politica = POLITICAS[politica];
+      }
+
+      const buffer = await criarWorkbook(window.ExcelJS, todos,
+        { ...opcoes, ...extra, consolidado: true });
+      estado.gerados.push({ nome, blob: paraBlob(buffer), grupo: todos, extra });
       feito++;
     }
 
@@ -505,9 +654,14 @@ function desenharResultados() {
     linha.className = 'resultado';
 
     const info = document.createElement('div');
-    const nRegistos = g.grupo.ficheiros.reduce((a, f) => a + f.registos.length, 0);
+    const nRegistos = g.extra?.registos
+      ? g.extra.registos.length
+      : g.grupo.ficheiros.reduce((a, f) => a + f.registos.length, 0);
+    const repetidos = g.extra?.duplicados?.length
+      ? ` · ${g.extra.duplicados.length} repetição(ões) resolvida(s)` : '';
     info.innerHTML = `<div class="resultado-nome">📗 ${g.nome}</div>`
-      + `<div class="ficheiro-meta">${g.grupo.ficheiros.length} ficheiro(s) · ${nRegistos} registo(s)</div>`;
+      + `<div class="ficheiro-meta">${g.grupo.ficheiros.length} ficheiro(s) · `
+      + `${nRegistos} registo(s)${repetidos}</div>`;
 
     const btn = document.createElement('button');
     btn.type = 'button';

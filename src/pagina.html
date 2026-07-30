@@ -40,6 +40,24 @@
           <small>Ficheiros gerados aqui, com os técnicos e tipos já indicados.</small>
         </span>
       </label>
+      <label class="opcao">
+        <input type="radio" name="fonte" value="acrescentar">
+        <span>
+          <strong>Acrescentar a um consolidado existente</strong>
+          <small>Junta novos relatórios a um consolidado já gerado, sem repetir processos.</small>
+        </span>
+      </label>
+    </div>
+
+    <div id="area-base" hidden>
+      <h3>Consolidado a acrescer</h3>
+      <div id="zona-base" class="zona-larga zona-pequena" tabindex="0" role="button"
+           aria-label="Escolher o consolidado existente">
+        <p><strong>Escolha o consolidado já gerado</strong> — é a base a que os outros se juntam</p>
+        <input type="file" id="input-base" accept=".xlsx" hidden>
+      </div>
+      <div id="info-base" class="lista" hidden></div>
+      <h3>Relatórios a juntar</h3>
     </div>
 
     <div id="zona" class="zona-larga" tabindex="0" role="button" aria-label="Escolher ficheiros">
@@ -89,6 +107,37 @@
       <input type="checkbox" id="gerar-consolidado" checked>
       <span>Gerar também o ficheiro único consolidado</span>
     </label>
+
+    <div id="area-politica" hidden>
+      <h3>Em caso de repetição <span class="opcional">(mesmo Nº do DU na mesma data)</span></h3>
+      <p class="nota">
+        Os processos repetidos entram uma só vez. Escolha qual das versões fica — as outras são
+        listadas na folha <strong>Redundâncias</strong> do ficheiro gerado.
+      </p>
+      <div class="opcoes" role="radiogroup" aria-label="Política de redundâncias">
+        <label class="opcao">
+          <input type="radio" name="politica" value="completo" checked>
+          <span>
+            <strong>A versão mais preenchida</strong>
+            <small>Fica a que tiver técnico e estado indicados; em caso de empate, a que já estava.</small>
+          </span>
+        </label>
+        <label class="opcao">
+          <input type="radio" name="politica" value="base">
+          <span>
+            <strong>A que já estava</strong>
+            <small>O consolidado existente (ou o primeiro relatório carregado) manda.</small>
+          </span>
+        </label>
+        <label class="opcao">
+          <input type="radio" name="politica" value="novo">
+          <span>
+            <strong>A que está a ser acrescentada</strong>
+            <small>Os relatórios novos substituem o que lá estava.</small>
+          </span>
+        </label>
+      </div>
+    </div>
   </section>
 
   <!-- 3. Configuração ---------------------------------------------- -->

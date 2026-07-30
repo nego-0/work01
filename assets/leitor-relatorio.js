@@ -122,6 +122,94 @@ export async function lerRelatorio(ExcelJS, buffer, nomeFicheiro = '') {
   return { nome: nomeFicheiro, tecnicos, registos };
 }
 
+/* ------------------------------------------------------------------ */
+/* Junção de relatórios com detecção de redundâncias                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Identidade de um processo: o Nº do DU dentro da sua data de registo. É o que
+ * distingue um processo de outro — se a mesma dupla aparecer em dois
+ * relatórios, trata-se do mesmo processo.
+ */
+export function chaveRegisto(r) {
+  return `${String(r.numeroDU).trim().toLowerCase()}|${r.dataReg}`;
+}
+
+/** Duas versões do mesmo processo trazem exactamente os mesmos dados? */
+function mesmosDados(a, b) {
+  return a.periodo === b.periodo
+    && a.dataReg === b.dataReg
+    && Number(a.totalTaxas) === Number(b.totalTaxas)
+    && (a.estado || '') === (b.estado || '')
+    && (a.tecnico || '') === (b.tecnico || '');
+}
+
+/** Quanto está preenchida uma versão — usado pela política "a mais completa". */
+function preenchimento(r) {
+  return (r.tecnico ? 4 : 0) + (r.tipo ? 2 : 0) + (r.estado ? 1 : 0);
+}
+
+export const POLITICAS = {
+  completo: 'a versão mais preenchida',
+  base: 'a que já estava',
+  novo: 'a que está a ser acrescentada',
+};
+
+/**
+ * Junta os registos de vários relatórios, um processo por linha.
+ *
+ * A ordem das fontes é a ordem de prioridade: a primeira é a que "já estava".
+ * As linhas ficam na ordem em que aparecem, e uma linha repetida não cria uma
+ * nova posição — substitui (ou não) a que lá está, conforme a política.
+ *
+ * @param {Array<{origem:string, registos:Array}>} fontes
+ * @param {'completo'|'base'|'novo'} politica
+ * @returns {{registos:Array, duplicados:Array, novos:number}}
+ */
+export function juntarRegistos(fontes, politica = 'completo') {
+  const registos = [];
+  const posicao = new Map();
+  const duplicados = [];
+
+  for (const fonte of fontes) {
+    for (const bruto of fonte.registos) {
+      const registo = { ...bruto, origemRelatorio: fonte.origem };
+      const chave = chaveRegisto(registo);
+
+      if (!posicao.has(chave)) {
+        posicao.set(chave, registos.length);
+        registos.push(registo);
+        continue;
+      }
+
+      const i = posicao.get(chave);
+      const jaEstava = registos[i];
+      const iguais = mesmosDados(jaEstava, registo);
+
+      let mantido = jaEstava;
+      let descartado = registo;
+      if (politica === 'novo') {
+        mantido = registo;
+        descartado = jaEstava;
+      } else if (politica === 'completo' && preenchimento(registo) > preenchimento(jaEstava)) {
+        mantido = registo;
+        descartado = jaEstava;
+      }
+
+      registos[i] = mantido;
+      duplicados.push({
+        numeroDU: registo.numeroDU,
+        dataReg: registo.dataReg,
+        iguais,
+        mantido,
+        descartado,
+      });
+    }
+  }
+
+  return { registos, duplicados, novos: registos.length };
+}
+
 /** Junta os mapas de técnicos de vários relatórios, sem repetir nomes. */
 export function juntarTecnicos(relatorios) {
   const juntos = [];

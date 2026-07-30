@@ -505,6 +505,70 @@ function construirFolhaOrigem(ws, ficheiros) {
 }
 
 /**
+ * Folha com os processos que apareceram em mais do que um relatório, o que foi
+ * mantido e o que foi posto de lado.
+ */
+function construirFolhaRedundancias(ws, duplicados, politica = '') {
+  ws.columns = [
+    { width: 12 }, { width: 13 }, { width: 13 }, { width: 26 }, { width: 22 },
+    { width: 12 }, { width: 16 }, { width: 26 }, { width: 22 }, { width: 12 }, { width: 16 },
+  ];
+
+  ws.mergeCells(1, 1, 1, 11);
+  const t = ws.getCell(1, 1);
+  t.value = 'PROCESSOS REPETIDOS';
+  t.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+  t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_SECCAO } };
+  t.alignment = { vertical: 'middle' };
+  ws.getRow(1).height = 20;
+
+  ws.mergeCells(2, 1, 2, 11);
+  const nota = ws.getCell(2, 1);
+  nota.value = politica
+    ? `Em caso de repetição foi mantida ${politica}.`
+    : 'Processos encontrados em mais do que um relatório.';
+  nota.font = { italic: true, size: 9, color: { argb: 'FF595959' } };
+
+  ws.mergeCells(3, 4, 3, 7);
+  ws.mergeCells(3, 8, 3, 11);
+  for (const [col, texto, cor] of [[4, 'MANTIDO', 'FFE2EFDA'], [8, 'POSTO DE LADO', 'FFFCE4D6']]) {
+    const c = ws.getCell(3, col);
+    c.value = texto;
+    c.font = { bold: true };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: cor } };
+    c.alignment = { horizontal: 'center' };
+  }
+
+  linhaCabecalho(ws, 4, [
+    'Nº do DU', 'Data de Reg.', 'Situação',
+    'Relatório', 'Técnico', 'Estado', 'Total das Taxas',
+    'Relatório', 'Técnico', 'Estado', 'Total das Taxas',
+  ]);
+
+  duplicados.forEach((d, i) => {
+    const row = ws.getRow(5 + i);
+    row.getCell(1).value = /^\d+$/.test(String(d.numeroDU)) ? Number(d.numeroDU) : d.numeroDU;
+    row.getCell(2).value = d.dataReg ? excelSerial(d.dataReg) : '';
+    row.getCell(2).numFmt = FMT_DATA;
+    row.getCell(3).value = d.iguais ? 'Dados iguais' : 'Dados diferentes';
+    if (!d.iguais) row.getCell(3).font = { bold: true, color: { argb: 'FFB3261E' } };
+
+    [[4, d.mantido], [8, d.descartado]].forEach(([col, versao]) => {
+      row.getCell(col).value = versao.origemRelatorio || versao.ficheiro || '';
+      row.getCell(col).font = { size: 9, color: { argb: 'FF595959' } };
+      row.getCell(col + 1).value = versao.tecnico || '';
+      row.getCell(col + 2).value = versao.estado || '';
+      row.getCell(col + 3).value = versao.totalTaxas == null ? null : versao.totalTaxas;
+      row.getCell(col + 3).numFmt = FMT_NUMERO;
+    });
+    aplicarBorda(row, 1, 11);
+  });
+
+  ws.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + duplicados.length, column: 11 } };
+  ws.views = [{ state: 'frozen', ySplit: 4, topLeftCell: 'A5', activeCell: 'A5' }];
+}
+
+/**
  * Constrói o workbook de um grupo (3 dias seguidos) ou do consolidado.
  *
  * @param {object} ExcelJS         biblioteca ExcelJS
@@ -517,20 +581,17 @@ export async function criarWorkbook(ExcelJS, grupo, opcoes = {}) {
   wb.creator = 'Gerador de Relatórios';
   wb.created = new Date();
 
-  const registos = [];
-  for (const f of grupo.ficheiros) {
-    for (const r of f.registos) {
-      registos.push({
-        periodo: r.periodo || f.periodo,
-        dataReg: r.dataReg,
-        totalTaxas: r.totalTaxas,
-        numeroDU: r.numeroDU,
-        estado: r.estado,
-        tecnico: r.tecnico,
-        ficheiro: r.ficheiro || f.nome,
-      });
-    }
-  }
+  // Quando os registos já vêm juntos (junção de relatórios, com as
+  // redundâncias resolvidas), usam-se tal como estão.
+  const registos = opcoes.registos || grupo.ficheiros.flatMap((f) => f.registos.map((r) => ({
+    periodo: r.periodo || f.periodo,
+    dataReg: r.dataReg,
+    totalTaxas: r.totalTaxas,
+    numeroDU: r.numeroDU,
+    estado: r.estado,
+    tecnico: r.tecnico,
+    ficheiro: r.ficheiro || f.nome,
+  })));
   // Sem ordenação: as linhas ficam na ordem em que aparecem nos PDFs.
 
   const nomes = grupo.ficheiros.map((f) => f.nome).join(' · ');
@@ -550,6 +611,10 @@ export async function criarWorkbook(ExcelJS, grupo, opcoes = {}) {
   });
 
   construirFolhaOrigem(wb.addWorksheet('Ficheiros de Origem'), grupo.ficheiros);
+
+  if (opcoes.duplicados && opcoes.duplicados.length) {
+    construirFolhaRedundancias(wb.addWorksheet('Redundâncias'), opcoes.duplicados, opcoes.politica);
+  }
 
   return wb.xlsx.writeBuffer();
 }

@@ -70,6 +70,7 @@ code { background: #eef1f6; padding: 1px 5px; border-radius: 4px; font-size: .85
   background: #eef5fd; border-color: var(--azul); outline: none;
 }
 .zona-larga p { margin: 4px 0; }
+.zona-pequena { padding: 14px 12px; border-style: solid; border-width: 1px; }
 .zona-icone { font-size: 2rem; }
 
 /* Lista de ficheiros ---------------------------------------------- */

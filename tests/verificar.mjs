@@ -29,6 +29,8 @@
  *      um ficheiro por dia dá um grupo por cada dia.
  *  11. Um relatório preenchido com técnicos pode ser relido sem perder nada:
  *      mesmas linhas, mesma ordem, técnicos, estados e tipos preservados.
+ *  12. A junção de relatórios apanha as repetições (mesmo Nº do DU na mesma
+ *      data), mantém a versão pedida por cada política e não duplica linhas.
  */
 
 import fs from 'node:fs/promises';
@@ -46,7 +48,7 @@ import {
   dayNumber,
 } from '../assets/parser.js';
 import { criarWorkbook, COLUNAS, COLUNA_ORIGEM } from '../assets/report.js';
-import { lerRelatorio } from '../assets/leitor-relatorio.js';
+import { lerRelatorio, juntarRegistos, chaveRegisto } from '../assets/leitor-relatorio.js';
 
 const pasta = process.argv[2];
 if (!pasta) {
@@ -386,6 +388,79 @@ for (const g of [...grupos, { datas: [], ficheiros, rotulo: 'Consolidado', conso
   verificar((ws.getCell(1, 1).alignment || {}).horizontal === 'left'
     && (ws.getCell(2, 1).alignment || {}).horizontal === 'left',
   'título e subtítulo alinhados à esquerda');
+}
+
+/* ---- 12 — junção com redundâncias --------------------------------- */
+console.log('\n▸ Junção de relatórios');
+{
+  const primeiro = ficheiros[0];
+  const segundo = ficheiros[1];
+
+  // O mesmo relatório duas vezes: tudo repetido, nada acrescentado.
+  const comoEstao = primeiro.registos.map((r) => ({ ...r, tecnico: '', estado: 'Pago' }));
+  const preenchidos = primeiro.registos.map((r) => ({ ...r, tecnico: 'Ana', tipo: 'A', estado: 'Não Pago' }));
+
+  const iguais = juntarRegistos([
+    { origem: 'a.xlsx', registos: comoEstao },
+    { origem: 'b.xlsx', registos: comoEstao },
+  ], 'completo');
+  verificar(iguais.registos.length === comoEstao.length,
+    'o mesmo relatório duas vezes não duplica linhas',
+    `${iguais.registos.length} de ${comoEstao.length}`);
+  verificar(iguais.duplicados.length === comoEstao.length && iguais.duplicados.every((d) => d.iguais),
+    'todas as repetições são detectadas e marcadas como iguais');
+
+  // Política "a mais preenchida": ganha a versão com técnico.
+  const completo = juntarRegistos([
+    { origem: 'vazio.xlsx', registos: comoEstao },
+    { origem: 'cheio.xlsx', registos: preenchidos },
+  ], 'completo');
+  verificar(completo.registos.every((r) => r.tecnico === 'Ana'),
+    'política "mais preenchida" fica com a versão que tem técnico');
+  verificar(completo.duplicados.every((d) => !d.iguais),
+    'repetições com dados diferentes são assinaladas');
+
+  // Política "a que já estava": ganha a primeira fonte, mesmo sendo mais vazia.
+  const daBase = juntarRegistos([
+    { origem: 'vazio.xlsx', registos: comoEstao },
+    { origem: 'cheio.xlsx', registos: preenchidos },
+  ], 'base');
+  verificar(daBase.registos.every((r) => !r.tecnico), 'política "a que já estava" mantém a primeira');
+
+  // Política "a nova": ganha a última fonte.
+  const daNova = juntarRegistos([
+    { origem: 'cheio.xlsx', registos: preenchidos },
+    { origem: 'vazio.xlsx', registos: comoEstao },
+  ], 'novo');
+  verificar(daNova.registos.every((r) => !r.tecnico), 'política "a acrescentada" substitui a anterior');
+
+  // Relatórios sem processos em comum somam-se sem repetições.
+  const somados = juntarRegistos([
+    { origem: 'a.xlsx', registos: primeiro.registos },
+    { origem: 'b.xlsx', registos: segundo.registos },
+  ], 'completo');
+  verificar(somados.registos.length === primeiro.registos.length + segundo.registos.length,
+    'relatórios de dias diferentes somam-se todos',
+    `${somados.registos.length} de ${primeiro.registos.length + segundo.registos.length}`);
+  verificar(somados.duplicados.length === 0, 'sem repetições entre dias diferentes');
+  verificar(
+    somados.registos.every((r, i) => r.numeroDU
+      === [...primeiro.registos, ...segundo.registos][i].numeroDU),
+    'a ordem das fontes é respeitada na junção'
+  );
+
+  // A chave é o Nº do DU dentro da data: o mesmo DU noutro dia é outro processo.
+  const outroDia = primeiro.registos.map((r) => ({ ...r, dataReg: '2026-12-31' }));
+  const separados = juntarRegistos([
+    { origem: 'a.xlsx', registos: primeiro.registos },
+    { origem: 'c.xlsx', registos: outroDia },
+  ], 'completo');
+  verificar(separados.duplicados.length === 0 && separados.registos.length === primeiro.registos.length * 2,
+    'o mesmo Nº do DU noutra data conta como processo diferente');
+  verificar(chaveRegisto(primeiro.registos[0]) !== chaveRegisto(outroDia[0]),
+    'a chave inclui a data de registo');
+
+  console.log(`   ${primeiro.registos.length} + ${segundo.registos.length} linhas usadas nos cenários`);
 }
 
 console.log(`\n${verificacoes - falhas}/${verificacoes} verificações passaram.`);
