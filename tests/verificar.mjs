@@ -19,7 +19,9 @@
  *   6. Não há Nº do DU repetido dentro do mesmo ficheiro.
  *   7. O Excel gerado contém exactamente os mesmos registos, nas 7 colunas e
  *      na ordem pedidas, com Estado preenchido, Técnico vazio e Tipo em fórmula.
- *   8. Os grupos de 3 dias cobrem cada ficheiro exactamente uma vez.
+ *   8. Cada PDF contribui com todas as suas linhas: uma linha por processo, sem
+ *      agregações nem repetições, e cada linha identifica o PDF de origem.
+ *   9. Os grupos de 3 dias cobrem cada ficheiro exactamente uma vez.
  */
 
 import fs from 'node:fs/promises';
@@ -36,7 +38,7 @@ import {
   rotuloDoGrupo,
   dayNumber,
 } from '../assets/parser.js';
-import { criarWorkbook, COLUNAS } from '../assets/report.js';
+import { criarWorkbook, COLUNAS, COLUNA_ORIGEM } from '../assets/report.js';
 
 const pasta = process.argv[2];
 if (!pasta) {
@@ -177,9 +179,14 @@ for (const g of [...grupos, { datas: [], ficheiros, rotulo: 'Consolidado', conso
     'as 7 colunas estão pela ordem pedida',
     COLUNAS.map((c, i) => ws.getCell(linhaCab, i + 1).value).join(' | ')
   );
+  verificar(
+    ws.getCell(linhaCab, COLUNAS.length + 1).value === COLUNA_ORIGEM,
+    'coluna de origem (PDF) a seguir às 7 pedidas'
+  );
 
   const esperados = grupo.ficheiros.flatMap((f) => f.registos.map((r) => ({
     periodo: f.periodo, dataReg: r.dataReg, total: r.totalTaxas, du: String(r.numeroDU),
+    ficheiro: f.nome,
   })));
 
   const lidos = [];
@@ -195,17 +202,39 @@ for (const g of [...grupos, { datas: [], ficheiros, rotulo: 'Consolidado', conso
       estado: ws.getCell(r, 4).value,
       tecnico: ws.getCell(r, 6).value,
       tipo: ws.getCell(r, 7).value,
+      ficheiro: ws.getCell(r, 8).value,
     });
   }
 
   verificar(lidos.length === esperados.length, 'o Excel tem todos os registos',
     `${lidos.length} de ${esperados.length}`);
 
-  const chave = (o) => `${o.periodo}|${o.dataReg}|${o.total}|${o.du}`;
+  const chave = (o) => `${o.periodo}|${o.dataReg}|${o.total}|${o.du}|${o.ficheiro}`;
   const conjunto = new Set(lidos.map(chave));
   const emFalta = esperados.filter((e) => !conjunto.has(chave(e)));
   verificar(emFalta.length === 0, 'todos os registos do PDF estão no Excel com os mesmos valores',
     emFalta.slice(0, 3).map(chave).join(' ; '));
+
+  // cada PDF tem de contribuir com todas as suas linhas, uma a uma
+  for (const f of grupo.ficheiros) {
+    const doFicheiro = lidos.filter((l) => l.ficheiro === f.nome);
+    verificar(
+      doFicheiro.length === f.registos.length,
+      `todas as linhas de ${f.nome} estão no Excel`,
+      `${doFicheiro.length} de ${f.registos.length}`
+    );
+    console.log(`      ${f.nome}: ${doFicheiro.length} linha(s)`);
+    const dusExcel = new Set(doFicheiro.map((l) => l.du));
+    const emFaltaDU = f.registos.filter((r) => !dusExcel.has(String(r.numeroDU)));
+    verificar(emFaltaDU.length === 0, `nenhum processo de ${f.nome} em falta`,
+      emFaltaDU.map((r) => r.numeroDU).join(', '));
+  }
+
+  // uma linha por processo: nada agregado nem repetido
+  const chavesUnicas = new Set(lidos.map((l) => `${l.ficheiro}|${l.du}`));
+  verificar(chavesUnicas.size === lidos.length,
+    'uma linha por processo, sem repetições nem agregações',
+    `${lidos.length} linhas, ${chavesUnicas.size} processos distintos`);
 
   verificar(lidos.every((l) => l.estado === 'Pago'), 'Estado [4] preenchido com "Pago"');
   verificar(lidos.every((l) => l.tecnico === null || l.tecnico === undefined), 'Técnico [6] em branco');

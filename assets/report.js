@@ -29,6 +29,12 @@ export const COLUNAS = [
   'Tipo',
 ];
 
+/** Coluna extra, depois das 7 pedidas: de que PDF veio cada linha. */
+export const COLUNA_ORIGEM = 'Ficheiro (PDF)';
+
+/** Nº total de colunas da tabela de dados. */
+const N_COLUNAS = COLUNAS.length + 1;
+
 const COR_TITULO = 'FF1F3864';
 const COR_SECCAO = 'FF2E75B6';
 const COR_CABECALHO = 'FFD9E2F3';
@@ -53,13 +59,13 @@ function tituloSeccao(ws, linha, texto, nota) {
   cell.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
   cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_SECCAO } };
   cell.alignment = { vertical: 'middle' };
-  ws.mergeCells(linha, 1, linha, 7);
+  ws.mergeCells(linha, 1, linha, N_COLUNAS);
   ws.getRow(linha).height = 20;
   if (nota) {
     const c = ws.getCell(linha + 1, 1);
     c.value = nota;
     c.font = { italic: true, size: 9, color: { argb: 'FF595959' } };
-    ws.mergeCells(linha + 1, 1, linha + 1, 7);
+    ws.mergeCells(linha + 1, 1, linha + 1, N_COLUNAS);
     return linha + 2;
   }
   return linha + 1;
@@ -96,11 +102,11 @@ function construirFolhaRelatorio(ws, params) {
 
   ws.columns = [
     { width: 16 }, { width: 14 }, { width: 18 }, { width: 12 },
-    { width: 14 }, { width: 26 }, { width: 16 },
+    { width: 14 }, { width: 26 }, { width: 16 }, { width: 32 },
   ];
 
   /* ---- Título ---------------------------------------------------- */
-  ws.mergeCells(1, 1, 1, 7);
+  ws.mergeCells(1, 1, 1, N_COLUNAS);
   const t = ws.getCell(1, 1);
   t.value = titulo;
   t.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
@@ -108,7 +114,7 @@ function construirFolhaRelatorio(ws, params) {
   t.alignment = { vertical: 'middle', horizontal: 'center' };
   ws.getRow(1).height = 26;
 
-  ws.mergeCells(2, 1, 2, 7);
+  ws.mergeCells(2, 1, 2, N_COLUNAS);
   const s = ws.getCell(2, 1);
   s.value = subtitulo;
   s.font = { size: 10, color: { argb: 'FF404040' } };
@@ -154,9 +160,16 @@ function construirFolhaRelatorio(ws, params) {
   linha += 1;
 
   const linhaDadosTitulo = linha;
-  linha = tituloSeccao(ws, linha, 'DADOS');
+  linha = tituloSeccao(
+    ws,
+    linha,
+    'DADOS',
+    'Uma linha por processo extraído dos PDFs. Indique na coluna Técnico [6] quem '
+      + 'executou cada processo — o Tipo [7] e as estatísticas do topo acompanham. '
+      + 'A última coluna mostra de que PDF veio cada linha.'
+  );
   const linhaDadosCab = linha;
-  linha = linhaCabecalho(ws, linha, COLUNAS);
+  linha = linhaCabecalho(ws, linha, [...COLUNAS, COLUNA_ORIGEM]);
   const primDados = linha;
   const ultDados = primDados + Math.max(registos.length, 1) - 1;
 
@@ -278,7 +291,9 @@ function construirFolhaRelatorio(ws, params) {
     row.getCell(7).value = {
       formula: `IF($F${r}="","",IFERROR(VLOOKUP($F${r},${R.mapa},2,FALSE),""))`,
     };
-    aplicarBorda(row, 1, 7);
+    row.getCell(8).value = reg.ficheiro || '';
+    row.getCell(8).font = { size: 9, color: { argb: 'FF595959' } };
+    aplicarBorda(row, 1, N_COLUNAS);
   });
 
   /* ---- Acabamentos ----------------------------------------------- */
@@ -292,7 +307,7 @@ function construirFolhaRelatorio(ws, params) {
 
   ws.autoFilter = {
     from: { row: linhaDadosCab, column: 1 },
-    to: { row: ultDados, column: 7 },
+    to: { row: ultDados, column: N_COLUNAS },
   };
   ws.views = [{ state: 'frozen', ySplit: linhaDadosCab }];
 
@@ -363,6 +378,7 @@ export async function criarWorkbook(ExcelJS, grupo, opcoes = {}) {
         dataReg: r.dataReg,
         totalTaxas: r.totalTaxas,
         numeroDU: r.numeroDU,
+        ficheiro: f.nome,
       });
     }
   }

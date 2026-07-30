@@ -42,6 +42,11 @@ por esta ordem:
 | 5 | **Nº do DU** | coluna *N° do DU* do PDF |
 | 6 | **Técnico** | em branco, a preencher no Excel |
 | 7 | **Tipo** | fórmula: resulta do técnico escolhido |
+| — | **Ficheiro (PDF)** | coluna extra, a seguir às 7: de que PDF veio a linha |
+
+**Uma linha por processo.** Todos os processos de todos os PDFs do bloco vão para a
+tabela, sem agregações — cada linha tem a sua própria célula de **Técnico**, para se
+indicar quem foi o responsável por aquele processo em concreto.
 
 ### Nomes dos ficheiros PDF
 
@@ -79,7 +84,8 @@ A folha **Relatório** tem as estatísticas no topo e os dados por baixo:
    técnico e o tipo correspondente. Ao lado, quantos processos cada técnico
    executou e o total das taxas respectivo.
 3. **Estatísticas por Tipo** — quantidade e total de cada tipo, sem repetições.
-4. **Dados** — as 7 colunas, com filtro automático e painel fixo.
+4. **Dados** — uma linha por processo, com as 7 colunas mais a coluna de origem,
+   filtro automático e painel fixo.
 
 Tudo assenta em fórmulas nativas: basta escolher o técnico numa linha de dados
 (há lista pendente) para o **Tipo** ser preenchido automaticamente e todas as
@@ -112,7 +118,10 @@ nenhum total se perdeu ou veio de uma coluna vizinha, que as datas coincidem com
 nome do ficheiro, que os blocos têm dias consecutivos e que o Excel gerado contém
 exactamente os mesmos registos, nas colunas e ordem pedidas.
 
-Nos 5 PDFs de exemplo (208 processos) passaram as 70 verificações, e o resultado foi
+Confirma ainda, PDF a PDF, que todas as linhas de cada ficheiro chegaram ao Excel
+(17 + 52 + 50 + 35 + 54 nos exemplos) e que não há linhas repetidas nem agregadas.
+
+Nos 5 PDFs de exemplo (208 processos) passaram as 96 verificações, e o resultado foi
 ainda confrontado, linha a linha, com uma extracção feita por um método totalmente
 diferente (leitura ao nível do caractere): **208/208 registos iguais**.
 
