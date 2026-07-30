@@ -437,7 +437,15 @@ function construirFolhaRelatorio(ws, params) {
   };
 
   // Só o resumo fica fixo; os técnicos e os dados acompanham a rolagem.
-  ws.views = [{ state: 'frozen', ySplit: ultimaFixa, topLeftCell: `A${ultimaFixa + 1}` }];
+  // A célula activa tem de ficar abaixo do corte: se ficasse em A1 — dentro da
+  // zona congelada — alguns visualizadores rolam o painel de baixo até lá e o
+  // resumo aparece duas vezes.
+  ws.views = [{
+    state: 'frozen',
+    ySplit: ultimaFixa,
+    topLeftCell: `A${ultimaFixa + 1}`,
+    activeCell: `A${ultimaFixa + 1}`,
+  }];
 
   return {
     linhaResumoTitulo, linhaResumoCab, linhaResumoN, linhaResumoT, ultimaFixa,

@@ -281,6 +281,11 @@ for (const g of [...grupos, { datas: [], ficheiros, rotulo: 'Consolidado', conso
   verificar(vista.state === 'frozen' && vista.ySplit === linhaResumoT,
     'congelamento apenas até à segunda linha do resumo', JSON.stringify(vista));
   verificar(vista.ySplit < linhaCab, 'a tabela de dados acompanha a rolagem');
+  // A célula activa tem de ficar abaixo do corte, senão o painel de baixo rola
+  // até ela e o resumo aparece repetido.
+  verificar(vista.activeCell === `A${linhaResumoT + 1}` && vista.topLeftCell === `A${linhaResumoT + 1}`,
+    'painel inferior começa abaixo da zona congelada',
+    `activeCell=${vista.activeCell} topLeftCell=${vista.topLeftCell}`);
 
   // tabela de técnicos com metade das linhas de cada lado
   let linhaTec = 0;
