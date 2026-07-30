@@ -21,10 +21,10 @@
  *      na ordem pedidas, com Estado preenchido, Técnico vazio e Tipo em fórmula.
  *   8. Cada PDF contribui com todas as suas linhas: uma linha por processo, sem
  *      agregações nem repetições, e cada linha identifica o PDF de origem.
- *   9. O resumo tem, à direita, as estatísticas por Estado (Pago / Não Pago) e por
- *      Tipo [7]; a coluna Estado tem lista pendente com esses valores; a tabela
- *      de técnicos tem metade das linhas de cada lado; e tudo o que está acima
- *      dos dados, incluindo o cabeçalho das colunas, fica congelado.
+ *   9. O resumo cabe em duas linhas (nº de processos e total das taxas), com uma
+ *      coluna por indicador — total, períodos, atribuição, estados e tipos — e é
+ *      a única parte congelada da folha; a tabela de técnicos tem metade das
+ *      linhas de cada lado.
  *  10. Os grupos de 3 dias cobrem cada ficheiro exactamente uma vez.
  */
 
@@ -242,40 +242,45 @@ for (const g of [...grupos, { datas: [], ficheiros, rotulo: 'Consolidado', conso
 
   verificar(lidos.every((l) => l.estado === 'Pago'), 'Estado [4] preenchido com "Pago"');
 
-  // estatísticas por Estado e por Tipo, à direita do resumo
-  let linhaEstados = 0;
+  // resumo compacto: cabeçalho + exactamente duas linhas de valores
+  let linhaResumoN = 0;
   for (let r = 1; r < linhaCab; r++) {
-    if (ws.getCell(r, 5).value === 'Estado [4]') { linhaEstados = r; break; }
+    if (ws.getCell(r, 1).value === 'Nº de Processos') { linhaResumoN = r; break; }
   }
-  verificar(linhaEstados > 0, 'bloco de estados à direita do resumo');
-  verificar(ws.getCell(linhaEstados, 1).value === 'Indicador',
-    'estados na mesma linha de cabeçalho do resumo');
-  verificar(ws.getCell(linhaEstados, 9).value === 'Tipo [7]',
-    'bloco de tipos à direita dos estados', String(ws.getCell(linhaEstados, 9).value));
+  verificar(linhaResumoN > 0, 'resumo com a linha "Nº de Processos"');
+  const linhaResumoT = linhaResumoN + 1;
+  const linhaResumoCab = linhaResumoN - 1;
+  verificar(ws.getCell(linhaResumoT, 1).value === 'Total das Taxas',
+    'resumo ocupa apenas duas linhas de valores', String(ws.getCell(linhaResumoT, 1).value));
+  verificar(ws.getCell(linhaResumoCab, 1).value === 'Indicador',
+    'cabeçalho do resumo por cima das duas linhas');
 
-  if (linhaEstados) {
-    const rotulos = [ws.getCell(linhaEstados + 1, 5).value, ws.getCell(linhaEstados + 2, 5).value];
-    verificar(rotulos[0] === 'Pago' && rotulos[1] === 'Não Pago',
-      'estados Pago e Não Pago listados', rotulos.join(' | '));
-    verificar(
-      [1, 2].every((i) => {
-        const n = ws.getCell(linhaEstados + i, 6).value;
-        const t = ws.getCell(linhaEstados + i, 7).value;
-        return n && n.formula && n.formula.startsWith('COUNTIF')
-          && t && t.formula && t.formula.startsWith('SUMIF');
-      }),
-      'estados contados e somados por fórmula'
-    );
-    verificar(
-      [1, 2].every((i) => {
-        const tipo = ws.getCell(linhaEstados + i, 9).value;
-        const n = ws.getCell(linhaEstados + i, 10).value;
-        return tipo && tipo.formula && tipo.formula.includes('MATCH')
-          && n && n.formula && n.formula.includes('COUNTIF');
-      }),
-      'tipos distintos listados e contados por fórmula'
-    );
+  const cabResumo = [];
+  for (let c = 2; c <= 30; c++) {
+    const v = ws.getCell(linhaResumoCab, c).value;
+    if (v === null || v === undefined) break;
+    cabResumo.push(typeof v === 'object' && v.formula ? `f:${v.formula}` : v);
   }
+  verificar(cabResumo[0] === 'Total de processos', 'primeira coluna do resumo é o total');
+  verificar(cabResumo.includes('Pago') && cabResumo.includes('Não Pago'),
+    'estados no resumo', cabResumo.join(' | '));
+  verificar(cabResumo.filter((v) => String(v).includes('MATCH')).length >= 3,
+    'colunas de tipos no resumo', String(cabResumo.filter((v) => String(v).includes('MATCH')).length));
+  verificar(cabResumo.includes('Outros tipos'), 'coluna de segurança "Outros tipos"');
+
+  verificar(
+    [linhaResumoN, linhaResumoT].every((r) => cabResumo.every((_, i) => {
+      const v = ws.getCell(r, 2 + i).value;
+      return v && typeof v === 'object' && v.formula;
+    })),
+    'todas as células do resumo são fórmulas'
+  );
+
+  // só o resumo fica congelado
+  const vista = (ws.views || [])[0] || {};
+  verificar(vista.state === 'frozen' && vista.ySplit === linhaResumoT,
+    'congelamento apenas até à segunda linha do resumo', JSON.stringify(vista));
+  verificar(vista.ySplit < linhaCab, 'a tabela de dados acompanha a rolagem');
 
   // tabela de técnicos com metade das linhas de cada lado
   let linhaTec = 0;
@@ -285,11 +290,6 @@ for (const g of [...grupos, { datas: [], ficheiros, rotulo: 'Consolidado', conso
   verificar(linhaTec > 0, 'tabela de técnicos encontrada');
   verificar(ws.getCell(linhaTec, 6).value === 'Técnico [6]',
     'técnicos com uma metade de cada lado', String(ws.getCell(linhaTec, 6).value));
-
-  // o topo fica fixo, incluindo o cabeçalho das colunas
-  const vista = (ws.views || [])[0] || {};
-  verificar(vista.state === 'frozen' && vista.ySplit === linhaCab,
-    'topo e cabeçalho dos dados congelados', JSON.stringify(vista));
 
   const dv = ws.getCell(linhaCab + 1, 4).dataValidation;
   verificar(

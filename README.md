@@ -71,23 +71,21 @@ Relatorio_Consolidado.xlsx               (todos)
 
 A folha **Relatório** tem as estatísticas no topo e os dados por baixo:
 
-1. **Resumo**, com três blocos lado a lado:
-   - **Indicadores** — total de processos e de taxas, contagem e soma por período,
-     quantos já têm técnico e quantos faltam;
-   - **Estado [4]** — quantos processos e que valor estão **Pago** e **Não Pago**
-     (a coluna Estado dos dados tem lista pendente com esses valores);
-   - **Tipo [7]** — quantidade e total de cada tipo, sem repetições, mais uma
-     linha *Outros tipos* que garante que nada fica de fora.
+1. **Resumo** — cabe em **duas linhas**: uma com o *Nº de Processos* e outra com
+   o *Total das Taxas*, e uma coluna por indicador:
+
+   | Total | por período | Com técnico · Por atribuir | Pago · Não Pago | cada Tipo · Outros tipos |
+   |---|---|---|---|---|
+
+   É a **única parte congelada** da folha, por isso acompanha sempre a leitura da
+   tabela. As colunas de tipo são preenchidas sozinhas com os tipos distintos
+   definidos nos técnicos, e *Outros tipos* garante que nada fica por contar.
 2. **Técnicos** — a área editável (células amarelas) onde se escreve o nome do
    técnico e o tipo correspondente, com o nº de processos e o total das taxas de
    cada um. As linhas estão repartidas em **duas metades lado a lado** (por
-   omissão 6 + 6).
+   omissão 6 + 6). Rola com a folha.
 3. **Dados** — uma linha por processo, com as 7 colunas mais a coluna de origem
-   e filtro automático.
-
-Tudo o que está acima da tabela — incluindo o cabeçalho das colunas — fica
-**congelado**: as estatísticas continuam à vista enquanto se percorre a tabela.
-A folha abre a 90% de zoom para esse topo caber mesmo em ecrãs baixos.
+   e filtro automático. Rola com a folha.
 
 Tudo assenta em fórmulas nativas: basta escolher o técnico numa linha de dados
 (há lista pendente) para o **Tipo** ser preenchido automaticamente e todas as
@@ -122,10 +120,10 @@ exactamente os mesmos registos, nas colunas e ordem pedidas.
 
 Confirma ainda, PDF a PDF, que todas as linhas de cada ficheiro chegaram ao Excel
 (17 + 52 + 50 + 35 + 54 nos exemplos), que não há linhas repetidas nem agregadas, e
-que os blocos de estados e de tipos, as listas pendentes e o congelamento do
-topo estão no sítio.
+que o resumo cabe em duas linhas com todos os indicadores, que as listas
+pendentes estão activas e que só o resumo fica congelado.
 
-Nos 5 PDFs de exemplo (208 processos) passaram as 126 verificações, e o resultado foi
+Nos 5 PDFs de exemplo (208 processos) passaram as 135 verificações, e o resultado foi
 ainda confrontado, linha a linha, com uma extracção feita por um método totalmente
 diferente (leitura ao nível do caractere): **208/208 registos iguais**.
 

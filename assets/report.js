@@ -5,7 +5,9 @@
  * no browser (global `ExcelJS`) como em Node (import 'exceljs').
  *
  * Estrutura de cada folha "Relatório":
- *   1. Resumo, com as estatísticas por Estado [4] e por Tipo [7] à direita
+ *   1. Resumo compacto — duas linhas (nº de processos e total das taxas) com uma
+ *      coluna por indicador: total, cada período, atribuição, estados e tipos.
+ *      É a única parte congelada da folha.
  *   2. Técnicos — área editável que define o Tipo [7] em função do Técnico [6]
  *      e mostra, por técnico, o nº de processos e o total das taxas, em duas
  *      metades lado a lado
@@ -35,12 +37,14 @@ export const COLUNA_ORIGEM = 'Ficheiro (PDF)';
 /** Nº total de colunas da tabela de dados. */
 const N_COLUNAS = COLUNAS.length + 1;
 
-/* Colunas onde começa cada bloco de estatísticas / da metade direita dos
-   técnicos, e a área auxiliar escondida que junta os dois lados do mapa. */
-const COL_ESTADO = 5;    // E — estatísticas por Estado [4]
-const COL_TIPO = 9;      // I — estatísticas por Tipo [7]
-const COL_TEC_DIR = 6;   // F — metade direita da tabela de técnicos
-const COL_AUX = 13;      // M — mapa auxiliar (escondido)
+/** Coluna onde começa a metade direita da tabela de técnicos. */
+const COL_TEC_DIR = 6;   // F
+
+/** Colunas reservadas no resumo para os tipos distintos. */
+const N_COLUNAS_TIPO = 5;
+
+/** Primeira coluna do mapa auxiliar escondido (nome, tipo, ordem). */
+const COL_AUX = 20;      // T
 
 const COR_TITULO = 'FF1F3864';
 const COR_SECCAO = 'FF2E75B6';
@@ -104,13 +108,14 @@ function linhaCabecalho(ws, linha, valores, colInicial = 1) {
  *
  * Disposição:
  *
- *   RESUMO        | ESTADOS [4]      | TIPOS [7]        <- linhas 4..12
- *   TÉCNICOS [6] (6 linhas à esquerda + 6 à direita)    <- linhas 14..21
- *   DADOS (uma linha por processo)                      <- a partir da linha 25
+ *   RESUMO — uma coluna por indicador, duas linhas de valores:     <- linhas 3..6
+ *            "Nº de Processos" e "Total das Taxas"; inclui o total,
+ *            cada período, a atribuição, os estados e os tipos.
+ *   TÉCNICOS [6] — 6 linhas à esquerda + 6 à direita               <- a partir da 8
+ *   DADOS — uma linha por processo                                 <- a partir da 19
  *
- * Tudo o que está acima da tabela de dados, incluindo o cabeçalho das colunas,
- * fica congelado: as estatísticas continuam à vista enquanto se percorre a
- * tabela.
+ * Só o resumo fica congelado (as suas duas linhas de valores mais o cabeçalho);
+ * o resto acompanha a rolagem.
  *
  * @param {object} ws            worksheet ExcelJS
  * @param {object} params
@@ -130,84 +135,57 @@ function construirFolhaRelatorio(ws, params) {
   const metade = Math.ceil(totalTec / 2);
   const nTec = metade * 2;
 
+  const periodos = [...new Set(registos.map((r) => r.periodo).filter(Boolean))];
+  // Estados possíveis: o valor por omissão mais os restantes da lista.
+  const estados = [...new Set([estado, 'Pago', 'Não Pago'].filter(Boolean))];
+  const nTipos = N_COLUNAS_TIPO;
+
+  /* ---- Linhas ----------------------------------------------------- */
+  const linhaResumoTitulo = 3;
+  const linhaResumoCab = 4;
+  const linhaResumoN = 5;      // Nº de Processos
+  const linhaResumoT = 6;      // Total das Taxas
+  const ultimaFixa = linhaResumoT;
+
+  const linhaTecTitulo = ultimaFixa + 2;
+  const linhaTecCab = linhaTecTitulo + 1;
+  const primTec = linhaTecCab + 1;
+  const ultTec = primTec + metade - 1;
+
+  const linhaDadosTitulo = ultTec + 2;
+  const linhaDadosCab = linhaDadosTitulo + 1;
+  const primDados = linhaDadosCab + 1;
+  const ultDados = primDados + Math.max(registos.length, 1) - 1;
+
+  /* ---- Colunas ---------------------------------------------------- */
+  // As 8 primeiras servem a tabela de dados; as seguintes só o resumo.
+  const nColResumo = 1 + 1 + periodos.length + 2 + estados.length + nTipos + 1;
+  const larguras = [22, 14, 18, 14, 14, 20, 16, 22];
+  while (larguras.length < nColResumo) larguras.push(13);
   ws.columns = [
-    { width: 22 }, { width: 14 }, { width: 18 }, { width: 14 }, // A-D
-    { width: 14 }, { width: 22 }, { width: 16 }, { width: 22 }, // E-H
-    { width: 16 }, { width: 16 }, { width: 18 },                // I-K (tipos)
-    { width: 2 },                                               // L  (separador)
-    { width: 18 }, { width: 14 }, { width: 8 },                 // M-O (auxiliar)
+    ...larguras.map((width) => ({ width })),
+    ...Array.from({ length: COL_AUX - larguras.length - 1 }, () => ({ width: 9 })),
+    { width: 18 }, { width: 14 }, { width: 8 }, // área auxiliar
   ];
   for (const c of [COL_AUX, COL_AUX + 1, COL_AUX + 2]) ws.getColumn(c).hidden = true;
 
-  /* ---- Título ---------------------------------------------------- */
-  ws.mergeCells(1, 1, 1, COL_TIPO + 2);
+  /* ---- Título ----------------------------------------------------- */
+  ws.mergeCells(1, 1, 1, nColResumo);
   const t = ws.getCell(1, 1);
   t.value = titulo;
   t.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
   t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_TITULO } };
   t.alignment = { vertical: 'middle', horizontal: 'center' };
-  ws.getRow(1).height = 26;
+  ws.getRow(1).height = 24;
 
-  ws.mergeCells(2, 1, 2, COL_TIPO + 2);
+  ws.mergeCells(2, 1, 2, nColResumo);
   const s = ws.getCell(2, 1);
   s.value = subtitulo;
   s.font = { size: 10, color: { argb: 'FF404040' } };
   s.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-  ws.getRow(2).height = 30;
+  ws.getRow(2).height = 26;
 
-  /* ---- Posições --------------------------------------------------- */
-  const periodos = [...new Set(registos.map((r) => r.periodo).filter(Boolean))];
-  // Estados possíveis: o valor por omissão mais os restantes da lista.
-  const estados = [...new Set([estado, 'Pago', 'Não Pago'].filter(Boolean))];
-  const nResumoLinhas = 2 + periodos.length + (periodos.length ? 1 : 0);
-  const nTipos = Math.max(nResumoLinhas - 1, 4); // + a linha "Outros tipos"
-
-  let linha = 4;
-  const linhaResumoTitulo = linha;
-  linha = tituloSeccao(ws, linha, 'RESUMO', null, COL_TIPO + 2);
-  const linhaResumoCab = linha;
-  linhaCabecalho(ws, linha, ['Indicador', 'Nº de Processos', 'Total das Taxas']);
-  linhaCabecalho(ws, linha, ['Estado [4]', 'Nº de Processos', 'Total das Taxas'], COL_ESTADO);
-  linha = linhaCabecalho(ws, linha, ['Tipo [7]', 'Nº de Processos', 'Total das Taxas'], COL_TIPO);
-  const primResumo = linha;
-  linha += Math.max(nResumoLinhas, estados.length, nTipos + 1);
-  linha += 1; // espaço
-
-  const linhaTecTitulo = linha;
-  linha = tituloSeccao(
-    ws,
-    linha,
-    'TÉCNICOS [6] — DEFINIR O TIPO [7] DE CADA UM',
-    'escreva o nome e o tipo nas células amarelas; na tabela de dados basta escolher '
-      + 'o técnico e o tipo aparece sozinho',
-    COL_TIPO + 2
-  );
-  const linhaTecCab = linha;
-  linhaCabecalho(ws, linha, ['Técnico [6]', 'Tipo [7]', 'Nº de Processos', 'Total das Taxas']);
-  linha = linhaCabecalho(
-    ws, linha, ['Técnico [6]', 'Tipo [7]', 'Nº de Processos', 'Total das Taxas'], COL_TEC_DIR
-  );
-  const primTec = linha;
-  const ultTec = primTec + metade - 1;
-  linha = ultTec + 2;
-
-  const linhaDadosTitulo = linha;
-  linha = tituloSeccao(
-    ws,
-    linha,
-    'DADOS',
-    'uma linha por processo extraído dos PDFs; indique o técnico responsável em cada '
-      + 'linha — a última coluna mostra de que PDF veio',
-    COL_TIPO + 2
-  );
-  const linhaDadosCab = linha;
-  linha = linhaCabecalho(ws, linha, [...COLUNAS, COLUNA_ORIGEM]);
-  const primDados = linha;
-  const ultDados = primDados + Math.max(registos.length, 1) - 1;
-
-  /* Intervalos usados pelas fórmulas ------------------------------- */
-  const auxPrim = 1;
-  const auxUlt = nTec;
+  /* Intervalos usados pelas fórmulas -------------------------------- */
   const A = letraCol(COL_AUX);          // nomes (auxiliar)
   const B = letraCol(COL_AUX + 1);      // tipos (auxiliar)
   const C = letraCol(COL_AUX + 2);      // ordem do 1º aparecimento
@@ -219,15 +197,15 @@ function construirFolhaRelatorio(ws, params) {
     du: `$E$${primDados}:$E$${ultDados}`,
     tecnico: `$F$${primDados}:$F$${ultDados}`,
     tipo: `$G$${primDados}:$G$${ultDados}`,
-    mapa: `$${A}$${auxPrim}:$${B}$${auxUlt}`,
-    mapaNomes: `$${A}$${auxPrim}:$${A}$${auxUlt}`,
-    mapaTipos: `$${B}$${auxPrim}:$${B}$${auxUlt}`,
-    mapaOrdem: `$${C}$${auxPrim}:$${C}$${auxUlt}`,
+    mapa: `$${A}$1:$${B}$${nTec}`,
+    mapaNomes: `$${A}$1:$${A}$${nTec}`,
+    mapaTipos: `$${B}$1:$${B}$${nTec}`,
+    mapaOrdem: `$${C}$1:$${C}$${nTec}`,
   };
 
-  /* ---- Área auxiliar (escondida): junta os dois lados num só mapa - */
+  /* ---- Área auxiliar (escondida): junta os dois lados num só mapa -- */
   for (let i = 0; i < nTec; i++) {
-    const r = auxPrim + i;
+    const r = 1 + i;
     const rMapa = primTec + (i % metade);
     const colNome = i < metade ? 'A' : letraCol(COL_TEC_DIR);
     const colTipo = i < metade ? 'B' : letraCol(COL_TEC_DIR + 1);
@@ -238,115 +216,141 @@ function construirFolhaRelatorio(ws, params) {
     row.getCell(COL_AUX + 2).value = {
       formula: i === 0
         ? `IF($${B}${r}="","",1)`
-        : `IF($${B}${r}="","",IF(COUNTIF($${B}$${auxPrim}:$${B}${r},$${B}${r})=1,`
-          + `MAX($${C}$${auxPrim}:$${C}${r - 1})+1,""))`,
+        : `IF($${B}${r}="","",IF(COUNTIF($${B}$1:$${B}${r},$${B}${r})=1,`
+          + `MAX($${C}$1:$${C}${r - 1})+1,""))`,
     };
   }
 
-  /* ---- Resumo ----------------------------------------------------- */
-  const resumo = [
-    {
-      rotulo: 'Total de processos',
-      n: `COUNTA(${R.du})`,
-      soma: `SUM(${R.total})`,
-      destaque: true,
-    },
-    ...periodos.map((p) => ({
-      rotulo: p,
+  /* ---- Resumo compacto: uma coluna por indicador ------------------ */
+  tituloSeccao(
+    ws,
+    linhaResumoTitulo,
+    'RESUMO',
+    'sempre à vista — acompanha o preenchimento da tabela de dados',
+    nColResumo
+  );
+
+  const colunas = [];
+  colunas.push({
+    titulo: 'Total de processos',
+    n: `COUNTA(${R.du})`,
+    soma: `SUM(${R.total})`,
+    grupo: 'total',
+  });
+  for (const p of periodos) {
+    colunas.push({
+      titulo: p,
       n: `COUNTIF(${R.periodo},"${p}")`,
       soma: `SUMIF(${R.periodo},"${p}",${R.total})`,
-    })),
-  ];
-  if (periodos.length) {
-    resumo.push({
-      rotulo: 'Com técnico atribuído',
-      n: `COUNTA(${R.du})-COUNTBLANK(${R.tecnico})`,
-      soma: `SUMIF(${R.tecnico},"<>",${R.total})`,
+      grupo: 'periodo',
     });
   }
-  resumo.push({
-    rotulo: 'Por atribuir',
+  // SUMPRODUCT em vez de SUMIF(...,"<>",...): o critério "<>" não é
+  // interpretado da mesma maneira por todas as folhas de cálculo.
+  const somaComTecnico = `SUMPRODUCT((${R.tecnico}<>"")*${R.total})`;
+  colunas.push({
+    titulo: 'Com técnico',
+    n: `COUNTA(${R.du})-COUNTBLANK(${R.tecnico})`,
+    soma: somaComTecnico,
+    grupo: 'atribuicao',
+  });
+  colunas.push({
+    titulo: 'Por atribuir',
     n: `COUNTBLANK(${R.tecnico})`,
-    soma: `SUM(${R.total})-SUMIF(${R.tecnico},"<>",${R.total})`,
+    soma: `SUM(${R.total})-${somaComTecnico}`,
+    grupo: 'atribuicao',
   });
-
-  resumo.forEach((item, i) => {
-    const row = ws.getRow(primResumo + i);
-    row.getCell(1).value = item.rotulo;
-    row.getCell(2).value = { formula: item.n };
-    row.getCell(3).value = { formula: item.soma };
-    row.getCell(2).numFmt = '#,##0';
-    row.getCell(3).numFmt = '#,##0';
-    if (item.destaque) for (let c = 1; c <= 3; c++) row.getCell(c).font = { bold: true };
-    for (let c = 1; c <= 3; c++) {
-      row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_CALC } };
-    }
-    aplicarBorda(row, 1, 3);
-  });
-
-  /* ---- Estatísticas por Estado ------------------------------------ */
-  const letraEstado = letraCol(COL_ESTADO);
-  estados.forEach((nome, i) => {
-    const r = primResumo + i;
-    const row = ws.getRow(r);
-    row.getCell(COL_ESTADO).value = nome;
-    row.getCell(COL_ESTADO + 1).value = { formula: `COUNTIF(${R.estado},$${letraEstado}${r})` };
-    row.getCell(COL_ESTADO + 2).value = {
-      formula: `SUMIF(${R.estado},$${letraEstado}${r},${R.total})`,
-    };
-    row.getCell(COL_ESTADO + 1).numFmt = '#,##0';
-    row.getCell(COL_ESTADO + 2).numFmt = '#,##0';
-    for (let c = COL_ESTADO; c <= COL_ESTADO + 2; c++) {
-      row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_CALC } };
-    }
-    aplicarBorda(row, COL_ESTADO, COL_ESTADO + 2);
-  });
-
-  /* ---- Estatísticas por Tipo -------------------------------------- */
-  const letraTipo = letraCol(COL_TIPO);
+  for (const e of estados) {
+    colunas.push({ titulo: e, criterio: R.estado, grupo: 'estado' });
+  }
+  // Índice, dentro de `colunas`, da primeira coluna de tipo.
+  const primColTipo = 1 + periodos.length + 2 + estados.length;
   for (let i = 0; i < nTipos; i++) {
-    const r = primResumo + i;
-    const row = ws.getRow(r);
-    // i-ésimo tipo distinto definido na tabela de técnicos.
-    row.getCell(COL_TIPO).value = {
-      formula: `IFERROR(INDEX(${R.mapaTipos},MATCH(${i + 1},${R.mapaOrdem},0)),"")`,
-    };
-    row.getCell(COL_TIPO + 1).value = {
-      formula: `IF($${letraTipo}${r}="","",COUNTIF(${R.tipo},$${letraTipo}${r}))`,
-    };
-    row.getCell(COL_TIPO + 2).value = {
-      formula: `IF($${letraTipo}${r}="","",SUMIF(${R.tipo},$${letraTipo}${r},${R.total}))`,
-    };
-    row.getCell(COL_TIPO + 1).numFmt = '#,##0';
-    row.getCell(COL_TIPO + 2).numFmt = '#,##0';
-    for (let c = COL_TIPO; c <= COL_TIPO + 2; c++) {
-      row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_CALC } };
+    colunas.push({
+      tituloFormula: `IFERROR(INDEX(${R.mapaTipos},MATCH(${i + 1},${R.mapaOrdem},0)),"")`,
+      criterio: R.tipo,
+      grupo: 'tipo',
+    });
+  }
+  colunas.push({ titulo: 'Outros tipos', grupo: 'tipo', outros: true });
+
+  const FUNDOS = {
+    total: 'FFBDD7EE',
+    periodo: COR_CABECALHO,
+    atribuicao: 'FFEDEDED',
+    estado: 'FFE2EFDA',
+    tipo: 'FFFCE4D6',
+  };
+
+  ws.getCell(linhaResumoCab, 1).value = 'Indicador';
+  ws.getCell(linhaResumoN, 1).value = 'Nº de Processos';
+  ws.getCell(linhaResumoT, 1).value = 'Total das Taxas';
+  for (const r of [linhaResumoCab, linhaResumoN, linhaResumoT]) {
+    const cell = ws.getCell(r, 1);
+    cell.font = { bold: true };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_CABECALHO } };
+    cell.alignment = { vertical: 'middle' };
+  }
+  ws.getRow(linhaResumoCab).height = 28;
+
+  colunas.forEach((col, i) => {
+    const c = 2 + i;
+    const letra = letraCol(c);
+    const primTipoLetra = letraCol(2 + primColTipo);
+    const ultTipoLetra = letraCol(2 + primColTipo + nTipos - 1);
+
+    const cabecalho = ws.getCell(linhaResumoCab, c);
+    cabecalho.value = col.tituloFormula ? { formula: col.tituloFormula } : col.titulo;
+    cabecalho.font = { bold: true, size: 10 };
+    cabecalho.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: FUNDOS[col.grupo] } };
+    cabecalho.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+
+    let fN;
+    let fT;
+    if (col.outros) {
+      // Rede de segurança: tipos que não couberam nas colunas acima.
+      fN = `SUMPRODUCT((${R.tipo}<>"")*1)`
+        + `-SUM($${primTipoLetra}$${linhaResumoN}:$${ultTipoLetra}$${linhaResumoN})`;
+      fT = `SUMPRODUCT((${R.tipo}<>"")*${R.total})`
+        + `-SUM($${primTipoLetra}$${linhaResumoT}:$${ultTipoLetra}$${linhaResumoT})`;
+    } else if (col.criterio) {
+      fN = `IF(${letra}$${linhaResumoCab}="","",COUNTIF(${col.criterio},${letra}$${linhaResumoCab}))`;
+      fT = `IF(${letra}$${linhaResumoCab}="","",`
+        + `SUMIF(${col.criterio},${letra}$${linhaResumoCab},${R.total}))`;
+    } else {
+      fN = col.n;
+      fT = col.soma;
     }
-    aplicarBorda(row, COL_TIPO, COL_TIPO + 2);
+
+    [[linhaResumoN, fN], [linhaResumoT, fT]].forEach(([r, formula]) => {
+      const cell = ws.getCell(r, c);
+      cell.value = { formula };
+      cell.numFmt = '#,##0';
+      cell.alignment = { horizontal: 'right' };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_CALC } };
+      if (col.grupo === 'total') cell.font = { bold: true };
+      if (col.outros) cell.font = { italic: true, color: { argb: 'FF595959' } };
+    });
+  });
+
+  for (const r of [linhaResumoCab, linhaResumoN, linhaResumoT]) {
+    aplicarBorda(ws.getRow(r), 1, 1 + colunas.length);
   }
 
-  // Rede de segurança: o que sobra caso haja mais tipos do que linhas.
-  const rOutros = primResumo + nTipos;
-  const rowOutros = ws.getRow(rOutros);
-  const letraN = letraCol(COL_TIPO + 1);
-  const letraT = letraCol(COL_TIPO + 2);
-  rowOutros.getCell(COL_TIPO).value = 'Outros tipos';
-  rowOutros.getCell(COL_TIPO + 1).value = {
-    formula: `COUNTIF(${R.tipo},"?*")-SUM($${letraN}$${primResumo}:$${letraN}$${rOutros - 1})`,
-  };
-  rowOutros.getCell(COL_TIPO + 2).value = {
-    formula: `SUMIF(${R.tipo},"?*",${R.total})`
-      + `-SUM($${letraT}$${primResumo}:$${letraT}$${rOutros - 1})`,
-  };
-  rowOutros.getCell(COL_TIPO + 1).numFmt = '#,##0';
-  rowOutros.getCell(COL_TIPO + 2).numFmt = '#,##0';
-  for (let c = COL_TIPO; c <= COL_TIPO + 2; c++) {
-    rowOutros.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_CALC } };
-    rowOutros.getCell(c).font = { italic: true, color: { argb: 'FF595959' } };
-  }
-  aplicarBorda(rowOutros, COL_TIPO, COL_TIPO + 2);
+  /* ---- Técnicos: metade das linhas de cada lado ------------------- */
+  tituloSeccao(
+    ws,
+    linhaTecTitulo,
+    'TÉCNICOS [6] — DEFINIR O TIPO [7] DE CADA UM',
+    'escreva o nome e o tipo nas células amarelas; na tabela de dados basta escolher '
+      + 'o técnico e o tipo aparece sozinho',
+    nColResumo
+  );
+  linhaCabecalho(ws, linhaTecCab, ['Técnico [6]', 'Tipo [7]', 'Nº de Processos', 'Total das Taxas']);
+  linhaCabecalho(
+    ws, linhaTecCab, ['Técnico [6]', 'Tipo [7]', 'Nº de Processos', 'Total das Taxas'], COL_TEC_DIR
+  );
 
-  /* ---- Técnicos: 6 linhas de cada lado ---------------------------- */
   for (let i = 0; i < metade; i++) {
     const r = primTec + i;
     const row = ws.getRow(r);
@@ -372,6 +376,16 @@ function construirFolhaRelatorio(ws, params) {
   }
 
   /* ---- Dados ------------------------------------------------------ */
+  tituloSeccao(
+    ws,
+    linhaDadosTitulo,
+    'DADOS',
+    'uma linha por processo extraído dos PDFs; indique o técnico responsável em cada '
+      + 'linha — a última coluna mostra de que PDF veio',
+    nColResumo
+  );
+  linhaCabecalho(ws, linhaDadosCab, [...COLUNAS, COLUNA_ORIGEM]);
+
   registos.forEach((reg, i) => {
     const r = primDados + i;
     const row = ws.getRow(r);
@@ -382,7 +396,7 @@ function construirFolhaRelatorio(ws, params) {
       row.getCell(2).numFmt = 'dd/mm/yyyy';
       row.getCell(2).alignment = { horizontal: 'center' };
     }
-    row.getCell(3).value = reg.totalTaxas == null ? '' : reg.totalTaxas;
+    row.getCell(3).value = reg.totalTaxas == null ? null : reg.totalTaxas;
     row.getCell(3).numFmt = '#,##0';
     row.getCell(4).value = estado;
     row.getCell(4).alignment = { horizontal: 'center' };
@@ -422,20 +436,12 @@ function construirFolhaRelatorio(ws, params) {
     to: { row: ultDados, column: N_COLUNAS },
   };
 
-  // Tudo o que está acima dos dados fica fixo, incluindo o cabeçalho das
-  // colunas: as estatísticas acompanham a leitura da tabela.
-  // O zoom a 90% dá folga para o topo congelado caber mesmo em ecrãs baixos.
-  ws.views = [{
-    state: 'frozen',
-    ySplit: linhaDadosCab,
-    topLeftCell: `A${primDados}`,
-    zoomScale: 90,
-    zoomScaleNormal: 90,
-  }];
+  // Só o resumo fica fixo; os técnicos e os dados acompanham a rolagem.
+  ws.views = [{ state: 'frozen', ySplit: ultimaFixa, topLeftCell: `A${ultimaFixa + 1}` }];
 
   return {
-    linhaResumoTitulo, linhaResumoCab, linhaTecTitulo, linhaTecCab,
-    linhaDadosTitulo, linhaDadosCab,
+    linhaResumoTitulo, linhaResumoCab, linhaResumoN, linhaResumoT, ultimaFixa,
+    linhaTecTitulo, linhaTecCab, linhaDadosTitulo, linhaDadosCab,
     primDados, ultDados, primTec, ultTec, metade,
   };
 }
