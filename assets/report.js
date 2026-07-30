@@ -101,7 +101,7 @@ function construirFolhaRelatorio(ws, params) {
   const nLinhasTec = Math.max(params.linhasTecnicos || 12, tecnicos.length + 4);
 
   ws.columns = [
-    { width: 16 }, { width: 14 }, { width: 18 }, { width: 12 },
+    { width: 22 }, { width: 14 }, { width: 18 }, { width: 12 },
     { width: 14 }, { width: 26 }, { width: 16 }, { width: 32 },
   ];
 
@@ -201,13 +201,13 @@ function construirFolhaRelatorio(ws, params) {
   }
   if (periodos.length) {
     resumo.push({
-      rotulo: 'Processos com técnico atribuído',
+      rotulo: 'Com técnico atribuído',
       n: `COUNTA(${R.du})-COUNTBLANK(${R.tecnico})`,
       soma: `SUMIF(${R.tecnico},"<>",${R.total})`,
     });
   }
   resumo.push({
-    rotulo: 'Processos por atribuir',
+    rotulo: 'Por atribuir',
     n: `COUNTBLANK(${R.tecnico})`,
     soma: `SUM(${R.total})-SUMIF(${R.tecnico},"<>",${R.total})`,
   });
@@ -282,6 +282,7 @@ function construirFolhaRelatorio(ws, params) {
     row.getCell(3).value = reg.totalTaxas == null ? '' : reg.totalTaxas;
     row.getCell(3).numFmt = '#,##0';
     row.getCell(4).value = estado;
+    row.getCell(4).alignment = { horizontal: 'center' };
     row.getCell(5).value = /^\d+$/.test(String(reg.numeroDU)) && !/^0\d/.test(String(reg.numeroDU))
       ? Number(reg.numeroDU)
       : String(reg.numeroDU);
