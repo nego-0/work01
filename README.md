@@ -9,17 +9,10 @@ Corre inteiramente no navegador — os PDFs nunca saem do computador de quem a u
 
 Endereço final: **https://nego-0.github.io/work01/**
 
-O GitHub Pages tem de ser ligado uma vez à mão — é o único passo que não pode ser
-feito por código, porque o token do Actions não tem permissão para criar o site:
-
-1. *Settings → Pages → Source:* escolher **GitHub Actions**.
-2. *Actions → Publicar no GitHub Pages → Run workflow* (ou fazer um `push`).
-
-O workflow [`.github/workflows/pages.yml`](.github/workflows/pages.yml) publica o
-site a cada `push` para `main` ou para um ramo `claude/**`.
-
-Em alternativa, sem workflow nenhum: *Settings → Pages → Source: **Deploy from a
-branch***, escolhendo o ramo e a pasta `/ (root)` — o site é ficheiros estáticos.
+O site é publicado pelo workflow
+[`.github/workflows/static.yml`](.github/workflows/static.yml) a cada `push` para o
+ramo de trabalho, e pode ser lançado à mão em *Actions → Deploy static content to
+Pages → Run workflow*. Requer *Settings → Pages → Source:* **GitHub Actions**.
 
 Também funciona a partir de qualquer servidor estático — basta servir a pasta do
 repositório (os módulos ES não funcionam com `file://`):
