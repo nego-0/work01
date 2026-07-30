@@ -37,9 +37,10 @@ por esta ordem:
 | 7 | **Tipo** | fórmula: resulta do técnico escolhido |
 | — | **Ficheiro (PDF)** | coluna extra, a seguir às 7: de que PDF veio a linha |
 
-**Uma linha por processo.** Todos os processos de todos os PDFs do bloco vão para a
-tabela, sem agregações — cada linha tem a sua própria célula de **Técnico**, para se
-indicar quem foi o responsável por aquele processo em concreto.
+**Uma linha por processo, pela ordem dos PDFs.** Todos os processos de todos os
+PDFs do bloco vão para a tabela, sem agregações nem reordenações — a sequência é
+exactamente a do documento original. Cada linha tem a sua própria célula de
+**Técnico**, para se indicar quem foi o responsável por aquele processo.
 
 ### Nomes dos ficheiros PDF
 
@@ -123,7 +124,7 @@ Confirma ainda, PDF a PDF, que todas as linhas de cada ficheiro chegaram ao Exce
 que o resumo cabe em duas linhas com todos os indicadores, que as listas
 pendentes estão activas e que só o resumo fica congelado.
 
-Nos 5 PDFs de exemplo (208 processos) passaram as 135 verificações, e o resultado foi
+Nos 5 PDFs de exemplo (208 processos) passaram as 144 verificações, e o resultado foi
 ainda confrontado, linha a linha, com uma extracção feita por um método totalmente
 diferente (leitura ao nível do caractere): **208/208 registos iguais**.
 
@@ -148,3 +149,6 @@ tests/verificar.mjs   testes de precisão sobre PDFs reais
 - Quando o nome do destinatário transborda e fica colado ao total das taxas, o
   bloco de texto é dividido em palavras com posição estimada, para que o total
   não se perca.
+- Os números levam o prefixo de formato `[$-416]`, que fixa o **ponto** como
+  separador de milhares seja quais forem as definições regionais de quem abre o
+  ficheiro. (O identificador de Portugal, `816`, usa espaço.)

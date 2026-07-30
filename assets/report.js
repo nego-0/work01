@@ -53,6 +53,15 @@ const COR_INPUT = 'FFFFF2CC';
 const COR_CALC = 'FFF2F2F2';
 const BORDA = { style: 'thin', color: { argb: 'FFBFBFBF' } };
 
+/**
+ * Formato dos números. O prefixo de idioma obriga a folha de cálculo a usar o
+ * ponto como separador de milhares, seja quais forem as definições regionais de
+ * quem abre o ficheiro. Usa-se 416 (português do Brasil) e não 816 (Portugal)
+ * porque a convenção de Portugal é separar os milhares por espaço.
+ */
+const FMT_NUMERO = '[$-416]#,##0';
+const FMT_DATA = '[$-416]dd/mm/yyyy';
+
 /** Letra da coluna (1 -> 'A'). Só é usado até à coluna Z. */
 function letraCol(n) {
   return String.fromCharCode(64 + n);
@@ -175,14 +184,14 @@ function construirFolhaRelatorio(ws, params) {
   t.value = titulo;
   t.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
   t.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_TITULO } };
-  t.alignment = { vertical: 'middle', horizontal: 'center' };
+  t.alignment = { vertical: 'middle', horizontal: 'left' };
   ws.getRow(1).height = 24;
 
   ws.mergeCells(2, 1, 2, nColResumo);
   const s = ws.getCell(2, 1);
   s.value = subtitulo;
   s.font = { size: 10, color: { argb: 'FF404040' } };
-  s.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  s.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
   ws.getRow(2).height = 26;
 
   /* Intervalos usados pelas fórmulas -------------------------------- */
@@ -325,7 +334,7 @@ function construirFolhaRelatorio(ws, params) {
     [[linhaResumoN, fN], [linhaResumoT, fT]].forEach(([r, formula]) => {
       const cell = ws.getCell(r, c);
       cell.value = { formula };
-      cell.numFmt = '#,##0';
+      cell.numFmt = FMT_NUMERO;
       cell.alignment = { horizontal: 'right' };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_CALC } };
       if (col.grupo === 'total') cell.font = { bold: true };
@@ -369,8 +378,8 @@ function construirFolhaRelatorio(ws, params) {
         row.getCell(col + 3).value = {
           formula: `IF($${letra}${r}="","",SUMIF(${R.tecnico},$${letra}${r},${R.total}))`,
         };
-        row.getCell(col + 2).numFmt = '#,##0';
-        row.getCell(col + 3).numFmt = '#,##0';
+        row.getCell(col + 2).numFmt = FMT_NUMERO;
+        row.getCell(col + 3).numFmt = FMT_NUMERO;
         aplicarBorda(row, col, col + 3);
       });
   }
@@ -393,11 +402,11 @@ function construirFolhaRelatorio(ws, params) {
     row.getCell(1).value = reg.periodo || '';
     if (reg.dataReg) {
       row.getCell(2).value = excelSerial(reg.dataReg);
-      row.getCell(2).numFmt = 'dd/mm/yyyy';
+      row.getCell(2).numFmt = FMT_DATA;
       row.getCell(2).alignment = { horizontal: 'center' };
     }
     row.getCell(3).value = reg.totalTaxas == null ? null : reg.totalTaxas;
-    row.getCell(3).numFmt = '#,##0';
+    row.getCell(3).numFmt = FMT_NUMERO;
     row.getCell(4).value = estado;
     row.getCell(4).alignment = { horizontal: 'center' };
     row.getCell(5).value = /^\d+$/.test(String(reg.numeroDU)) && !/^0\d/.test(String(reg.numeroDU))
@@ -476,9 +485,9 @@ function construirFolhaOrigem(ws, ficheiros) {
     row.getCell(3).value = f.dataIso ? formatDatePt(f.dataIso) : '(não identificada)';
     row.getCell(3).alignment = { horizontal: 'center' };
     row.getCell(4).value = f.registos.length;
-    row.getCell(4).numFmt = '#,##0';
+    row.getCell(4).numFmt = FMT_NUMERO;
     row.getCell(5).value = f.registos.reduce((a, r) => a + (r.totalTaxas || 0), 0);
-    row.getCell(5).numFmt = '#,##0';
+    row.getCell(5).numFmt = FMT_NUMERO;
     aplicarBorda(row, 1, 5);
   });
 
@@ -487,8 +496,8 @@ function construirFolhaOrigem(ws, ficheiros) {
   row.getCell(1).value = 'TOTAL';
   row.getCell(4).value = { formula: `SUM(D3:D${rTotal - 1})` };
   row.getCell(5).value = { formula: `SUM(E3:E${rTotal - 1})` };
-  row.getCell(4).numFmt = '#,##0';
-  row.getCell(5).numFmt = '#,##0';
+  row.getCell(4).numFmt = FMT_NUMERO;
+  row.getCell(5).numFmt = FMT_NUMERO;
   for (let c = 1; c <= 5; c++) row.getCell(c).font = { bold: true };
   aplicarBorda(row, 1, 5);
 }
@@ -518,10 +527,7 @@ export async function criarWorkbook(ExcelJS, grupo, opcoes = {}) {
       });
     }
   }
-  registos.sort(
-    (a, b) => (a.dataReg < b.dataReg ? -1 : a.dataReg > b.dataReg ? 1 : 0)
-      || String(a.numeroDU).localeCompare(String(b.numeroDU), 'pt', { numeric: true })
-  );
+  // Sem ordenação: as linhas ficam na ordem em que aparecem nos PDFs.
 
   const nomes = grupo.ficheiros.map((f) => f.nome).join(' · ');
   const ws = wb.addWorksheet('Relatório', {

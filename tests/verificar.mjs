@@ -306,8 +306,25 @@ for (const g of [...grupos, { datas: [], ficheiros, rotulo: 'Consolidado', conso
   verificar(lidos.every((l) => l.tipo && typeof l.tipo === 'object' && l.tipo.formula),
     'Tipo [7] calculado por fórmula a partir do Técnico');
 
-  const ordenado = lidos.every((l, i) => i === 0 || lidos[i - 1].dataReg <= l.dataReg);
-  verificar(ordenado, 'registos ordenados por data');
+  // a ordem tem de ser exactamente a dos PDFs, sem reordenações
+  const sequenciaEsperada = grupo.ficheiros.flatMap((f) => f.registos.map((r) => String(r.numeroDU)));
+  const sequenciaLida = lidos.map((l) => l.du);
+  const primeiraDiferenca = sequenciaEsperada.findIndex((v, i) => v !== sequenciaLida[i]);
+  verificar(
+    primeiraDiferenca === -1 && sequenciaLida.length === sequenciaEsperada.length,
+    'linhas na ordem exacta dos PDFs',
+    primeiraDiferenca >= 0
+      ? `posição ${primeiraDiferenca + 1}: esperado ${sequenciaEsperada[primeiraDiferenca]}, `
+        + `lido ${sequenciaLida[primeiraDiferenca]}`
+      : ''
+  );
+
+  // separador de milhares e alinhamento do cabeçalho
+  const fmt = ws.getCell(linhaResumoN, 2).numFmt || '';
+  verificar(/^\[\$-4\d\d\]/.test(fmt), 'números com separador de milhares fixo', fmt);
+  verificar((ws.getCell(1, 1).alignment || {}).horizontal === 'left'
+    && (ws.getCell(2, 1).alignment || {}).horizontal === 'left',
+  'título e subtítulo alinhados à esquerda');
 }
 
 console.log(`\n${verificacoes - falhas}/${verificacoes} verificações passaram.`);
