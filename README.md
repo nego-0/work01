@@ -31,7 +31,7 @@ por esta ordem:
 | 1 | **Período** | nome do ficheiro (Madrugada, Manhã, Tarde, Noite) |
 | 2 | **Data de Reg.** | coluna *Data de Reg.* do PDF |
 | 3 | **Total das Taxas** | coluna *Total das taxas* do PDF |
-| 4 | **Estado** | preenchido com `Pago` (configurável) |
+| 4 | **Estado** | preenchido com `Pago` (configurável); lista pendente Pago / Não Pago |
 | 5 | **Nº do DU** | coluna *N° do DU* do PDF |
 | 6 | **Técnico** | em branco, a preencher no Excel |
 | 7 | **Tipo** | fórmula: resulta do técnico escolhido |
@@ -71,8 +71,11 @@ Relatorio_Consolidado.xlsx               (todos)
 
 A folha **Relatório** tem as estatísticas no topo e os dados por baixo:
 
-1. **Resumo** — total de processos e de taxas, contagem e soma por período,
-   e quantos processos ainda estão por atribuir.
+1. **Resumo** — à esquerda, o total de processos e de taxas, a contagem e soma por
+   período e quantos processos ainda estão por atribuir; à direita, as
+   estatísticas por **Estado**: quantos processos e que valor estão **Pago** e
+   **Não Pago**. A coluna Estado dos dados tem lista pendente com esses valores,
+   por isso basta mudar uma linha para as contagens acompanharem.
 2. **Técnicos e Tipos** — à esquerda, a área editável (células amarelas) onde se
    escreve o nome do técnico e o tipo correspondente, com o nº de processos e o
    total das taxas de cada um; à direita, a quantidade e o total de cada tipo,

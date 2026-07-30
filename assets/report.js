@@ -45,6 +45,11 @@ const COR_INPUT = 'FFFFF2CC';
 const COR_CALC = 'FFF2F2F2';
 const BORDA = { style: 'thin', color: { argb: 'FFBFBFBF' } };
 
+/** Letra da coluna (1 -> 'A'). Só é usado até à coluna Z. */
+function letraCol(n) {
+  return String.fromCharCode(64 + n);
+}
+
 /** Serial do Excel para uma data ISO (independente do fuso horário). */
 function excelSerial(iso) {
   return dayNumber(iso) + 25569;
@@ -126,14 +131,18 @@ function construirFolhaRelatorio(ws, params) {
 
   /* ---- Reserva de posições (os dados ficam no fim da folha) ------- */
   const periodos = [...new Set(registos.map((r) => r.periodo).filter(Boolean))];
+  // Estados possíveis: o valor por omissão mais os restantes da lista.
+  const estados = [...new Set([estado, 'Pago', 'Não Pago'].filter(Boolean))];
 
   let linha = 4;
   const linhaResumoTitulo = linha;
   linha = tituloSeccao(ws, linha, 'RESUMO');
   const linhaResumoCab = linha;
-  linha = linhaCabecalho(ws, linha, ['Indicador', 'Nº de Processos', 'Total das Taxas']);
+  // À direita do resumo, as estatísticas por Estado [4].
+  linhaCabecalho(ws, linha, ['Indicador', 'Nº de Processos', 'Total das Taxas']);
+  linha = linhaCabecalho(ws, linha, ['Estado [4]', 'Nº de Processos', 'Total das Taxas'], COL_TIPO);
   const primResumo = linha;
-  const nResumo = 2 + periodos.length + (periodos.length ? 1 : 0);
+  const nResumo = Math.max(2 + periodos.length + (periodos.length ? 1 : 0), estados.length);
   linha += nResumo;
   linha += 1; // espaço
 
@@ -175,6 +184,7 @@ function construirFolhaRelatorio(ws, params) {
   const R = {
     periodo: `$A$${primDados}:$A$${ultDados}`,
     total: `$C$${primDados}:$C$${ultDados}`,
+    estado: `$D$${primDados}:$D$${ultDados}`,
     du: `$E$${primDados}:$E$${ultDados}`,
     tecnico: `$F$${primDados}:$F$${ultDados}`,
     tipo: `$G$${primDados}:$G$${ultDados}`,
@@ -226,6 +236,22 @@ function construirFolhaRelatorio(ws, params) {
     aplicarBorda(row, 1, 3);
   });
 
+  /* ---- Secção 1b: Estatísticas por Estado (à direita do resumo) -- */
+  estados.forEach((nome, i) => {
+    const row = ws.getRow(primResumo + i);
+    row.getCell(COL_TIPO).value = nome;
+    row.getCell(COL_TIPO + 1).value = { formula: `COUNTIF(${R.estado},$${letraCol(COL_TIPO)}${primResumo + i})` };
+    row.getCell(COL_TIPO + 2).value = {
+      formula: `SUMIF(${R.estado},$${letraCol(COL_TIPO)}${primResumo + i},${R.total})`,
+    };
+    row.getCell(COL_TIPO + 1).numFmt = '#,##0';
+    row.getCell(COL_TIPO + 2).numFmt = '#,##0';
+    for (let c = COL_TIPO; c <= COL_TIPO + 2; c++) {
+      row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_CALC } };
+    }
+    aplicarBorda(row, COL_TIPO, COL_TIPO + 2);
+  });
+
   /* ---- Secção 2: Técnicos (mapa + estatísticas) ------------------ */
   for (let i = 0; i < nLinhasTec; i++) {
     const r = primTec + i;
@@ -246,7 +272,7 @@ function construirFolhaRelatorio(ws, params) {
   }
 
   /* ---- Secção 3: Estatísticas por tipo (ao lado dos técnicos) ---- */
-  const letraTipo = String.fromCharCode(64 + COL_TIPO); // coluna do tipo, ex.: 'F'
+  const letraTipo = letraCol(COL_TIPO); // coluna do bloco de tipos, ex.: 'F'
   for (let i = 0; i < nLinhasTec; i++) {
     const r = primTipo + i;
     const rMapa = primTec + i;
@@ -306,6 +332,14 @@ function construirFolhaRelatorio(ws, params) {
     type: 'list',
     allowBlank: true,
     formulae: [R.mapaTec],
+    showErrorMessage: false,
+  });
+
+  // Lista pendente na coluna Estado, para marcar um processo como não pago.
+  ws.dataValidations.add(`D${primDados}:D${ultDados}`, {
+    type: 'list',
+    allowBlank: true,
+    formulae: [`"${estados.join(',')}"`],
     showErrorMessage: false,
   });
 

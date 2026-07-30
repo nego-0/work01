@@ -21,7 +21,9 @@
  *      na ordem pedidas, com Estado preenchido, Técnico vazio e Tipo em fórmula.
  *   8. Cada PDF contribui com todas as suas linhas: uma linha por processo, sem
  *      agregações nem repetições, e cada linha identifica o PDF de origem.
- *   9. Os grupos de 3 dias cobrem cada ficheiro exactamente uma vez.
+ *   9. O resumo tem, à direita, as estatísticas por Estado (Pago / Não Pago) e a
+ *      coluna Estado tem lista pendente com esses valores.
+ *  10. Os grupos de 3 dias cobrem cada ficheiro exactamente uma vez.
  */
 
 import fs from 'node:fs/promises';
@@ -237,6 +239,34 @@ for (const g of [...grupos, { datas: [], ficheiros, rotulo: 'Consolidado', conso
     `${lidos.length} linhas, ${chavesUnicas.size} processos distintos`);
 
   verificar(lidos.every((l) => l.estado === 'Pago'), 'Estado [4] preenchido com "Pago"');
+
+  // estatísticas por Estado, à direita do resumo
+  let linhaEstados = 0;
+  for (let r = 1; r < linhaCab; r++) {
+    if (ws.getCell(r, 6).value === 'Estado [4]') { linhaEstados = r; break; }
+  }
+  verificar(linhaEstados > 0, 'bloco de estados à direita do resumo');
+  if (linhaEstados) {
+    const rotulos = [ws.getCell(linhaEstados + 1, 6).value, ws.getCell(linhaEstados + 2, 6).value];
+    verificar(rotulos[0] === 'Pago' && rotulos[1] === 'Não Pago',
+      'estados Pago e Não Pago listados', rotulos.join(' | '));
+    verificar(
+      [1, 2].every((i) => {
+        const n = ws.getCell(linhaEstados + i, 7).value;
+        const t = ws.getCell(linhaEstados + i, 8).value;
+        return n && n.formula && n.formula.startsWith('COUNTIF')
+          && t && t.formula && t.formula.startsWith('SUMIF');
+      }),
+      'estados contados e somados por fórmula'
+    );
+  }
+
+  const dv = ws.getCell(linhaCab + 1, 4).dataValidation;
+  verificar(
+    dv && dv.type === 'list' && /Pago/.test(String(dv.formulae[0])) && /Não Pago/.test(String(dv.formulae[0])),
+    'coluna Estado com lista pendente Pago / Não Pago',
+    JSON.stringify(dv)
+  );
   verificar(lidos.every((l) => l.tecnico === null || l.tecnico === undefined), 'Técnico [6] em branco');
   verificar(lidos.every((l) => l.tipo && typeof l.tipo === 'object' && l.tipo.formula),
     'Tipo [7] calculado por fórmula a partir do Técnico');
