@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gerador de Relatórios Excel — PDFs Document List</title>
+<meta name="description" content="Converte relatórios PDF em ficheiros Excel, com estatísticas por técnico, tipo e estado. Ficheiro único, funciona offline.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+<style>/*ESTILOS*/</style>
+</head>
+<body>
+
+<header class="topo">
+  <div class="wrap">
+    <h1>📊 Gerador de Relatórios Excel</h1>
+    <p>Lê os PDFs <em>Document List</em> — ou relatórios já preenchidos — e gera folhas Excel com
+       estatísticas por período, estado, técnico e tipo.</p>
+    <p class="nota">Ficheiro único, tudo acontece no seu navegador. Nada é enviado para a Internet.</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- 1. Origem ---------------------------------------------------- -->
+  <section class="cartao">
+    <h2><span class="passo">1</span> Origem dos dados</h2>
+
+    <div class="opcoes" role="radiogroup" aria-label="Origem dos dados">
+      <label class="opcao">
+        <input type="radio" name="fonte" value="pdf" checked>
+        <span>
+          <strong>Ficheiros PDF</strong>
+          <small>Os relatórios <em>Document List</em> exportados do sistema.</small>
+        </span>
+      </label>
+      <label class="opcao">
+        <input type="radio" name="fonte" value="relatorio">
+        <span>
+          <strong>Relatórios Excel já preenchidos</strong>
+          <small>Ficheiros gerados aqui, com os técnicos e tipos já indicados.</small>
+        </span>
+      </label>
+    </div>
+
+    <div id="zona" class="zona-larga" tabindex="0" role="button" aria-label="Escolher ficheiros">
+      <div class="zona-icone">📄</div>
+      <p><strong>Arraste os ficheiros para aqui</strong> ou clique para escolher</p>
+      <p class="nota" id="zona-nota">O nome deve conter a data e o período — ex.:
+         <code>Manhã 21.07.2026.pdf</code>, <code>01.07.2026_Tarde.pdf</code>,
+         <code>2026-07-23 Madrugada.pdf</code></p>
+      <input type="file" id="input-ficheiros" accept="application/pdf,.pdf" multiple hidden>
+    </div>
+
+    <div id="lista-ficheiros" class="lista" hidden></div>
+    <div class="acoes" id="acoes-ficheiros" hidden>
+      <button type="button" class="btn btn-fantasma" id="btn-limpar">Remover todos</button>
+    </div>
+  </section>
+
+  <!-- 2. O que gerar ------------------------------------------------ -->
+  <section class="cartao">
+    <h2><span class="passo">2</span> O que gerar</h2>
+
+    <div class="opcoes" role="radiogroup" aria-label="Ficheiros a gerar">
+      <label class="opcao">
+        <input type="radio" name="modo" value="3" checked>
+        <span>
+          <strong>Um ficheiro por cada 3 dias seguidos</strong>
+          <small>Cada bloco de 3 dias consecutivos dá origem a um Excel.</small>
+        </span>
+      </label>
+      <label class="opcao">
+        <input type="radio" name="modo" value="1">
+        <span>
+          <strong>Um ficheiro por dia</strong>
+          <small>Cada dia dá origem ao seu próprio Excel.</small>
+        </span>
+      </label>
+      <label class="opcao">
+        <input type="radio" name="modo" value="consolidado">
+        <span>
+          <strong>Apenas o consolidado</strong>
+          <small>Um único Excel com tudo o que foi carregado.</small>
+        </span>
+      </label>
+    </div>
+
+    <label class="campo campo-check" id="campo-consolidado">
+      <input type="checkbox" id="gerar-consolidado" checked>
+      <span>Gerar também o ficheiro único consolidado</span>
+    </label>
+  </section>
+
+  <!-- 3. Configuração ---------------------------------------------- -->
+  <section class="cartao">
+    <h2><span class="passo">3</span> Configuração</h2>
+
+    <div class="grelha-config">
+      <label class="campo">
+        <span>Estado [4] por omissão</span>
+        <input type="text" id="estado" value="Pago">
+      </label>
+      <label class="campo">
+        <span>Linhas de técnicos (metade de cada lado)</span>
+        <input type="number" id="linhas-tecnicos" value="12" min="2" max="200" step="2">
+      </label>
+    </div>
+
+    <h3>Técnicos [6] → Tipo [7] <span class="opcional">(opcional)</span></h3>
+    <p class="nota">
+      Estes pares são escritos na área de configuração de cada Excel. Pode deixar vazio e preencher
+      directamente no Excel — a coluna <strong>Tipo</strong> dos dados é calculada por fórmula a partir
+      do técnico escolhido, e as estatísticas actualizam-se automaticamente. Quando a origem são
+      relatórios já preenchidos, os técnicos deles são aproveitados.
+    </p>
+    <table class="tabela-tecnicos">
+      <thead><tr><th>Técnico [6]</th><th>Tipo [7]</th><th></th></tr></thead>
+      <tbody id="corpo-tecnicos"></tbody>
+    </table>
+    <button type="button" class="btn btn-fantasma" id="btn-add-tecnico">+ Adicionar técnico</button>
+  </section>
+
+  <!-- 4. Gerar ------------------------------------------------------ -->
+  <section class="cartao">
+    <h2><span class="passo">4</span> Gerar</h2>
+    <div class="acoes">
+      <button type="button" class="btn btn-principal" id="btn-gerar" disabled>Gerar ficheiros Excel</button>
+      <button type="button" class="btn" id="btn-zip" hidden>⬇ Descarregar tudo (.zip)</button>
+    </div>
+    <div id="progresso" class="progresso" hidden>
+      <div class="barra"><div class="barra-interior" id="barra-interior"></div></div>
+      <p id="progresso-texto"></p>
+    </div>
+    <div id="mensagens"></div>
+    <div id="resultados" class="resultados"></div>
+  </section>
+
+  <section class="cartao ajuda">
+    <h2>Como funciona</h2>
+    <ol>
+      <li><strong>Período [1]</strong> — lido do nome do ficheiro (Madrugada, Manhã, Tarde, Noite).</li>
+      <li><strong>Data de Reg. [2]</strong>, <strong>Total das Taxas [3]</strong> e <strong>Nº do DU [5]</strong> —
+          lidos das colunas correspondentes de cada página do PDF, pela ordem em que lá estão.</li>
+      <li><strong>Estado [4]</strong> — preenchido com <em>Pago</em> (configurável), com lista pendente
+          <em>Pago</em> / <em>Não Pago</em>.</li>
+      <li><strong>Técnico [6]</strong> e <strong>Tipo [7]</strong> — deixados em branco; o Tipo é calculado
+          automaticamente no Excel assim que indicar o técnico.</li>
+      <li>Depois de preencher os técnicos, pode voltar aqui, escolher <em>Relatórios Excel já preenchidos</em>
+          e juntar tudo num consolidado sem perder o que preencheu.</li>
+    </ol>
+  </section>
+</main>
+
+<footer class="rodape">
+  <div class="wrap">
+    <p>Ficheiro único — pode guardá-lo e usá-lo sem Internet ·
+       <a href="https://github.com/nego-0/work01">Código-fonte</a></p>
+  </div>
+</footer>
+
+<script>/*BIBLIOTECAS*/</script>
+<script type="module">/*APLICACAO*/</script>
+</body>
+</html>

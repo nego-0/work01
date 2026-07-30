@@ -407,13 +407,15 @@ function construirFolhaRelatorio(ws, params) {
     }
     row.getCell(3).value = reg.totalTaxas == null ? null : reg.totalTaxas;
     row.getCell(3).numFmt = FMT_NUMERO;
-    row.getCell(4).value = estado;
+    row.getCell(4).value = reg.estado || estado;
     row.getCell(4).alignment = { horizontal: 'center' };
     row.getCell(5).value = /^\d+$/.test(String(reg.numeroDU)) && !/^0\d/.test(String(reg.numeroDU))
       ? Number(reg.numeroDU)
       : String(reg.numeroDU);
     row.getCell(5).alignment = { horizontal: 'center' };
-    row.getCell(6).value = null; // Técnico [6] — em branco, a preencher
+    // Técnico [6] — em branco, a preencher; ou já preenchido, quando a origem é
+    // um relatório anterior.
+    row.getCell(6).value = reg.tecnico || null;
     row.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_INPUT } };
     row.getCell(7).value = {
       formula: `IF($F${r}="","",IFERROR(VLOOKUP($F${r},${R.mapa},2,FALSE),""))`,
@@ -519,11 +521,13 @@ export async function criarWorkbook(ExcelJS, grupo, opcoes = {}) {
   for (const f of grupo.ficheiros) {
     for (const r of f.registos) {
       registos.push({
-        periodo: f.periodo,
+        periodo: r.periodo || f.periodo,
         dataReg: r.dataReg,
         totalTaxas: r.totalTaxas,
         numeroDU: r.numeroDU,
-        ficheiro: f.nome,
+        estado: r.estado,
+        tecnico: r.tecnico,
+        ficheiro: r.ficheiro || f.nome,
       });
     }
   }

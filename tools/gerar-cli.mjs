@@ -60,7 +60,11 @@ for (const nome of nomes) {
   ficheiros.push({ nome, periodo, dataIso: data, registos });
 }
 
-const grupos = agruparPorDiasConsecutivos(ficheiros, Number(process.env.DIAS || 3));
+// MODO=3 (por omissão) | MODO=1 (um ficheiro por dia) | MODO=consolidado
+const modo = process.env.MODO || process.env.DIAS || '3';
+const grupos = modo === 'consolidado'
+  ? []
+  : agruparPorDiasConsecutivos(ficheiros, Number(modo) || 3);
 await fs.mkdir(saida, { recursive: true });
 
 for (const g of grupos) {

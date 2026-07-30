@@ -25,7 +25,10 @@
  *      coluna por indicador — total, períodos, atribuição, estados e tipos — e é
  *      a única parte congelada da folha; a tabela de técnicos tem metade das
  *      linhas de cada lado.
- *  10. Os grupos de 3 dias cobrem cada ficheiro exactamente uma vez.
+ *  10. Os grupos de 3 dias cobrem cada ficheiro exactamente uma vez, e o modo de
+ *      um ficheiro por dia dá um grupo por cada dia.
+ *  11. Um relatório preenchido com técnicos pode ser relido sem perder nada:
+ *      mesmas linhas, mesma ordem, técnicos, estados e tipos preservados.
  */
 
 import fs from 'node:fs/promises';
@@ -43,6 +46,7 @@ import {
   dayNumber,
 } from '../assets/parser.js';
 import { criarWorkbook, COLUNAS, COLUNA_ORIGEM } from '../assets/report.js';
+import { lerRelatorio } from '../assets/leitor-relatorio.js';
 
 const pasta = process.argv[2];
 if (!pasta) {
@@ -160,6 +164,14 @@ for (const g of grupos) {
 }
 const agrupados = grupos.flatMap((g) => g.ficheiros);
 verificar(agrupados.length === ficheiros.length, 'cada ficheiro entra exactamente num grupo');
+
+const porDia = agruparPorDiasConsecutivos(ficheiros, 1);
+const diasDistintos = new Set(ficheiros.map((f) => f.dataIso)).size;
+verificar(porDia.length === diasDistintos, 'modo "um ficheiro por dia" dá um grupo por dia',
+  `${porDia.length} grupos para ${diasDistintos} dias`);
+verificar(porDia.every((g) => g.datas.length === 1), 'cada grupo diário tem um só dia');
+verificar(porDia.flatMap((g) => g.ficheiros).length === ficheiros.length,
+  'nenhum ficheiro se perde no modo diário');
 
 /* ---- 7 — conteúdo do Excel ---------------------------------------- */
 console.log('\n▸ Ficheiros Excel gerados');
@@ -295,6 +307,55 @@ for (const g of [...grupos, { datas: [], ficheiros, rotulo: 'Consolidado', conso
   verificar(linhaTec > 0, 'tabela de técnicos encontrada');
   verificar(ws.getCell(linhaTec, 6).value === 'Técnico [6]',
     'técnicos com uma metade de cada lado', String(ws.getCell(linhaTec, 6).value));
+
+  /* ---- 11 — ida e volta: preencher e reler ------------------------ */
+  {
+    const wb2 = new ExcelJS.Workbook();
+    await wb2.xlsx.load(buffer);
+    const folha = wb2.getWorksheet('Relatório');
+    let rTec = 0;
+    for (let r = 1; r < linhaCab; r++) {
+      if (folha.getCell(r, 1).value === 'Técnico [6]') { rTec = r + 1; break; }
+    }
+    folha.getCell(rTec, 1).value = 'João';
+    folha.getCell(rTec, 2).value = 'A';
+    folha.getCell(rTec, 6).value = 'Ana';
+    folha.getCell(rTec, 7).value = 'B';
+
+    const equipa = ['João', 'Ana'];
+    let i = 0;
+    for (let r = linhaCab + 1; r <= folha.rowCount; r++) {
+      if (folha.getCell(r, 5).value === null || folha.getCell(r, 5).value === undefined) continue;
+      folha.getCell(r, 6).value = equipa[i % 2];
+      if (i % 3 === 0) folha.getCell(r, 4).value = 'Não Pago';
+      i++;
+    }
+
+    const relido = await lerRelatorio(ExcelJS, await wb2.xlsx.writeBuffer(), 'preenchido.xlsx');
+    verificar(relido.registos.length === lidos.length,
+      'relatório preenchido relido com todas as linhas',
+      `${relido.registos.length} de ${lidos.length}`);
+    verificar(
+      relido.registos.every((r, k) => r.numeroDU === lidos[k].du),
+      'ordem preservada ao reler o relatório'
+    );
+    verificar(relido.tecnicos.length === 2
+      && relido.tecnicos.some((t) => t.nome === 'João' && t.tipo === 'A')
+      && relido.tecnicos.some((t) => t.nome === 'Ana' && t.tipo === 'B'),
+    'mapa de técnicos relido das duas metades',
+    relido.tecnicos.map((t) => `${t.nome}=${t.tipo}`).join(', '));
+    verificar(relido.registos.every((r) => r.tecnico === 'João' || r.tecnico === 'Ana'),
+      'técnico de cada linha preservado');
+    verificar(
+      relido.registos.every((r) => r.tipo === (r.tecnico === 'João' ? 'A' : 'B')),
+      'tipo recalculado a partir do técnico'
+    );
+    verificar(relido.registos.filter((r) => r.estado === 'Não Pago').length === Math.ceil(lidos.length / 3),
+      'estados preservados ao reler',
+      String(relido.registos.filter((r) => r.estado === 'Não Pago').length));
+    verificar(relido.registos.every((r) => r.totalTaxas === lidos.find((l) => l.du === r.numeroDU).total),
+      'totais preservados ao reler');
+  }
 
   const dv = ws.getCell(linhaCab + 1, 4).dataValidation;
   verificar(

@@ -12,22 +12,60 @@ import {
   formatDatePt,
 } from './parser.js';
 import { criarWorkbook } from './report.js';
+import { lerRelatorio, juntarTecnicos } from './leitor-relatorio.js';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdf.worker.min.mjs', import.meta.url).href;
+if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc
+    && typeof globalThis.pdfjsWorker === 'undefined') {
+  // Só na versão em vários ficheiros: o single-file traz o worker embutido.
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdf.worker.min.mjs', import.meta.url).href;
+}
 
 const $ = (id) => document.getElementById(id);
+const seleccionado = (nome) => document.querySelector(`input[name="${nome}"]:checked`).value;
 
 const estado = {
-  ficheiros: [],   // { id, nome, periodo, dataIso, file, registos, erro }
-  gerados: [],     // { nome, blob }
+  fonte: 'pdf',    // 'pdf' | 'relatorio'
+  ficheiros: [],   // { id, nome, periodo, dataIso, file, registos, tecnicos, erro }
+  gerados: [],     // { nome, blob, grupo }
 };
 
 /* ------------------------------------------------------------------ */
-/* Ficheiros                                                           */
+/* Origem                                                              */
 /* ------------------------------------------------------------------ */
 
 const zona = $('zona');
 const inputFicheiros = $('input-ficheiros');
+
+function extensaoAceite() {
+  return estado.fonte === 'pdf' ? /\.pdf$/i : /\.xlsx$/i;
+}
+
+function aplicarFonte() {
+  estado.fonte = seleccionado('fonte');
+  const ehPdf = estado.fonte === 'pdf';
+
+  inputFicheiros.accept = ehPdf ? 'application/pdf,.pdf' : '.xlsx';
+  $('zona-nota').innerHTML = ehPdf
+    ? 'O nome deve conter a data e o período — ex.: <code>Manhã 21.07.2026.pdf</code>, '
+      + '<code>01.07.2026_Tarde.pdf</code>, <code>2026-07-23 Madrugada.pdf</code>'
+    : 'Relatórios <code>.xlsx</code> gerados por esta aplicação. Os técnicos e os estados que '
+      + 'lá estiverem preenchidos são mantidos.';
+
+  // A partir de relatórios só faz sentido consolidar.
+  for (const radio of document.querySelectorAll('input[name="modo"]')) {
+    radio.disabled = !ehPdf;
+    if (!ehPdf) radio.checked = radio.value === 'consolidado';
+  }
+  document.querySelectorAll('input[name="modo"]')[0].closest('.opcoes')
+    .classList.toggle('desactivada', !ehPdf);
+
+  estado.ficheiros = [];
+  desenharFicheiros();
+}
+
+for (const radio of document.querySelectorAll('input[name="fonte"]')) {
+  radio.addEventListener('change', aplicarFonte);
+}
 
 zona.addEventListener('click', () => inputFicheiros.click());
 zona.addEventListener('keydown', (e) => {
@@ -45,8 +83,7 @@ for (const ev of ['dragleave', 'drop']) {
   zona.addEventListener(ev, (e) => { e.preventDefault(); zona.classList.remove('activa'); });
 }
 zona.addEventListener('drop', (e) => {
-  const fs = [...(e.dataTransfer?.files || [])].filter((f) => /\.pdf$/i.test(f.name));
-  adicionarFicheiros(fs);
+  adicionarFicheiros([...(e.dataTransfer?.files || [])]);
 });
 
 $('btn-limpar').addEventListener('click', () => {
@@ -57,24 +94,27 @@ $('btn-limpar').addEventListener('click', () => {
 let contador = 0;
 
 async function adicionarFicheiros(files) {
+  const aceite = extensaoAceite();
   for (const file of files) {
-    if (!/\.pdf$/i.test(file.name)) continue;
+    if (!aceite.test(file.name)) continue;
     if (estado.ficheiros.some((f) => f.nome === file.name && f.file.size === file.size)) continue;
 
     const { periodo, dataIso } = parseFileName(file.name);
-    const registo = {
+    const item = {
       id: `f${++contador}`,
       nome: file.name,
       periodo,
       dataIso,
       file,
       registos: null,
+      tecnicos: [],
       erro: null,
       aLer: true,
     };
-    estado.ficheiros.push(registo);
+    estado.ficheiros.push(item);
     desenharFicheiros();
-    await lerPdf(registo);
+    if (estado.fonte === 'pdf') await lerPdf(item);
+    else await lerRelatorioExcel(item);
     desenharFicheiros();
   }
 }
@@ -90,10 +130,7 @@ async function lerPdf(item) {
     if (!item.registos.length) {
       item.erro = 'Nenhum registo encontrado (o PDF não parece ser um Document List).';
     } else if (!item.dataIso) {
-      // Sem data no nome: usa a data mais frequente dentro do PDF.
-      const contagem = {};
-      for (const r of item.registos) contagem[r.dataReg] = (contagem[r.dataReg] || 0) + 1;
-      item.dataIso = Object.entries(contagem).sort((a, b) => b[1] - a[1])[0][0];
+      item.dataIso = dataPredominante(item.registos);
       item.dataDeduzida = true;
     }
   } catch (err) {
@@ -103,6 +140,30 @@ async function lerPdf(item) {
   } finally {
     item.aLer = false;
   }
+}
+
+async function lerRelatorioExcel(item) {
+  try {
+    const buffer = await item.file.arrayBuffer();
+    const rel = await lerRelatorio(window.ExcelJS, buffer, item.nome);
+    item.registos = rel.registos;
+    item.tecnicos = rel.tecnicos;
+    item.dataIso = item.dataIso || dataPredominante(rel.registos);
+    item.periodo = '';   // cada linha traz o seu período
+  } catch (err) {
+    console.error(err);
+    item.erro = `Erro ao ler o relatório: ${err.message}`;
+    item.registos = [];
+  } finally {
+    item.aLer = false;
+  }
+}
+
+function dataPredominante(registos) {
+  const contagem = {};
+  for (const r of registos) if (r.dataReg) contagem[r.dataReg] = (contagem[r.dataReg] || 0) + 1;
+  const entradas = Object.entries(contagem).sort((a, b) => b[1] - a[1]);
+  return entradas.length ? entradas[0][0] : '';
 }
 
 function desenharFicheiros() {
@@ -135,12 +196,21 @@ function desenharFicheiros() {
     } else if (f.erro) {
       meta.textContent = f.erro;
     } else {
-      const marcas = [
-        `Período: ${f.periodo || '⚠ não identificado'}`,
-        `Data: ${f.dataIso ? formatDatePt(f.dataIso) : '⚠ não identificada'}${f.dataDeduzida ? ' (do conteúdo)' : ''}`,
-        `${f.registos.length} registo(s)`,
-        `Taxas: ${f.registos.reduce((a, r) => a + (r.totalTaxas || 0), 0).toLocaleString('pt-PT')}`,
-      ];
+      const taxas = f.registos.reduce((a, r) => a + (r.totalTaxas || 0), 0);
+      const marcas = estado.fonte === 'pdf'
+        ? [
+          `Período: ${f.periodo || '⚠ não identificado'}`,
+          `Data: ${f.dataIso ? formatDatePt(f.dataIso) : '⚠ não identificada'}`
+            + `${f.dataDeduzida ? ' (do conteúdo)' : ''}`,
+          `${f.registos.length} registo(s)`,
+          `Taxas: ${taxas.toLocaleString('pt-PT')}`,
+        ]
+        : [
+          `${f.registos.length} registo(s)`,
+          `${f.registos.filter((r) => r.tecnico).length} com técnico`,
+          `${f.tecnicos.length} técnico(s) no mapa`,
+          `Taxas: ${taxas.toLocaleString('pt-PT')}`,
+        ];
       meta.textContent = marcas.join(' · ');
     }
     info.appendChild(meta);
@@ -161,7 +231,7 @@ function desenharFicheiros() {
   }
 
   $('btn-gerar').disabled = !estado.ficheiros.some((f) => f.registos && f.registos.length);
-  mostrarPrevisaoGrupos();
+  mostrarPrevisao();
 }
 
 /* ------------------------------------------------------------------ */
@@ -201,7 +271,7 @@ $('btn-add-tecnico').addEventListener('click', () => adicionarLinhaTecnico());
 adicionarLinhaTecnico();
 adicionarLinhaTecnico();
 
-function lerTecnicos() {
+function lerTecnicosDoFormulario() {
   return [...$('corpo-tecnicos').querySelectorAll('tr')]
     .map((tr) => {
       const [nome, tipo] = [...tr.querySelectorAll('input')].map((i) => i.value.trim());
@@ -210,44 +280,79 @@ function lerTecnicos() {
     .filter((t) => t.nome);
 }
 
+/** Técnicos do formulário mais os que vierem dos relatórios carregados. */
+function tecnicosParaOsFicheiros() {
+  const doFormulario = lerTecnicosDoFormulario();
+  const dosRelatorios = juntarTecnicos(estado.ficheiros.filter((f) => f.tecnicos?.length));
+  const juntos = [...doFormulario];
+  const vistos = new Set(doFormulario.map((t) => t.nome.toLowerCase()));
+  for (const t of dosRelatorios) {
+    if (vistos.has(t.nome.toLowerCase())) continue;
+    vistos.add(t.nome.toLowerCase());
+    juntos.push(t);
+  }
+  return juntos;
+}
+
 /* ------------------------------------------------------------------ */
 /* Grupos                                                              */
 /* ------------------------------------------------------------------ */
 
+function ficheirosValidos() {
+  return estado.ficheiros.filter((f) => f.registos && f.registos.length);
+}
+
+/** Grupos por dias consecutivos; vazio quando só se quer o consolidado. */
 function calcularGrupos() {
-  const validos = estado.ficheiros.filter((f) => f.registos && f.registos.length);
-  const dias = Math.max(1, Number($('dias-grupo').value) || 3);
-  return agruparPorDiasConsecutivos(validos, dias).map((g) => ({
+  const modo = seleccionado('modo');
+  if (modo === 'consolidado') return [];
+  const dias = Number(modo) || 3;
+  return agruparPorDiasConsecutivos(ficheirosValidos(), dias).map((g) => ({
     ...g,
     rotulo: rotuloDoGrupo(g),
     nomeFicheiro: nomeDoGrupo(g),
   }));
 }
 
-function mostrarPrevisaoGrupos() {
+function querConsolidado() {
+  return seleccionado('modo') === 'consolidado' || $('gerar-consolidado').checked;
+}
+
+function mostrarPrevisao() {
   const alvo = $('mensagens');
   alvo.innerHTML = '';
+  const validos = ficheirosValidos();
+  if (!validos.length) return;
+
   const grupos = calcularGrupos();
-  if (!grupos.length) return;
+  const linhas = grupos.map((g) => {
+    const n = g.ficheiros.reduce((a, f) => a + f.registos.length, 0);
+    return `<li><strong>${g.nomeFicheiro}.xlsx</strong> — ${g.rotulo} · `
+      + `${g.ficheiros.length} ficheiro(s) · ${n} registo(s)</li>`;
+  });
+  if (querConsolidado()) {
+    const n = validos.reduce((a, f) => a + f.registos.length, 0);
+    linhas.push(`<li><strong>Relatorio_Consolidado.xlsx</strong> — tudo · ${n} registo(s)</li>`);
+  }
+  if (!linhas.length) return;
 
   const box = document.createElement('div');
   box.className = 'aviso aviso-info';
-  const total = grupos.length + ($('gerar-consolidado').checked ? 1 : 0);
-  const linhas = grupos.map((g) => {
-    const n = g.ficheiros.reduce((a, f) => a + f.registos.length, 0);
-    return `<li><strong>${g.nomeFicheiro}.xlsx</strong> — ${g.rotulo} · ${g.ficheiros.length} PDF(s) · ${n} registo(s)</li>`;
-  });
-  if ($('gerar-consolidado').checked) {
-    const n = grupos.reduce((a, g) => a + g.ficheiros.reduce((b, f) => b + f.registos.length, 0), 0);
-    linhas.push(`<li><strong>Relatorio_Consolidado.xlsx</strong> — todos os períodos · ${n} registo(s)</li>`);
-  }
-  box.innerHTML = `<p>Serão gerados <strong>${total}</strong> ficheiro(s) Excel:</p><ul>${linhas.join('')}</ul>`;
+  box.innerHTML = `<p>Serão gerados <strong>${linhas.length}</strong> ficheiro(s) Excel:</p>`
+    + `<ul>${linhas.join('')}</ul>`;
   alvo.appendChild(box);
 }
 
-for (const id of ['dias-grupo', 'gerar-consolidado']) {
-  $(id).addEventListener('change', mostrarPrevisaoGrupos);
+for (const radio of document.querySelectorAll('input[name="modo"]')) {
+  radio.addEventListener('change', () => {
+    const so = seleccionado('modo') === 'consolidado';
+    $('gerar-consolidado').checked = so || $('gerar-consolidado').checked;
+    $('gerar-consolidado').disabled = so;
+    $('campo-consolidado').classList.toggle('desactivada', so);
+    mostrarPrevisao();
+  });
 }
+$('gerar-consolidado').addEventListener('change', mostrarPrevisao);
 
 /* ------------------------------------------------------------------ */
 /* Geração                                                             */
@@ -269,14 +374,14 @@ async function gerar() {
   estado.gerados = [];
 
   const opcoes = {
-    tecnicos: lerTecnicos(),
+    tecnicos: tecnicosParaOsFicheiros(),
     estado: $('estado').value.trim() || 'Pago',
-    linhasTecnicos: Math.max(1, Number($('linhas-tecnicos').value) || 12),
+    linhasTecnicos: Math.max(2, Number($('linhas-tecnicos').value) || 12),
   };
 
   try {
     const grupos = calcularGrupos();
-    const consolidar = $('gerar-consolidado').checked;
+    const consolidar = querConsolidado();
     const total = grupos.length + (consolidar ? 1 : 0);
     let feito = 0;
 
@@ -291,10 +396,7 @@ async function gerar() {
     if (consolidar) {
       progresso(feito, total, 'A gerar Relatorio_Consolidado.xlsx…');
       await new Promise((r) => setTimeout(r, 0));
-      const todos = {
-        rotulo: 'Consolidado',
-        ficheiros: grupos.flatMap((g) => g.ficheiros),
-      };
+      const todos = { rotulo: 'Consolidado', ficheiros: ficheirosValidos() };
       const buffer = await criarWorkbook(window.ExcelJS, todos, { ...opcoes, consolidado: true });
       estado.gerados.push({ nome: 'Relatorio_Consolidado.xlsx', blob: paraBlob(buffer), grupo: todos });
       feito++;
@@ -330,7 +432,7 @@ function desenharResultados() {
     const info = document.createElement('div');
     const nRegistos = g.grupo.ficheiros.reduce((a, f) => a + f.registos.length, 0);
     info.innerHTML = `<div class="resultado-nome">📗 ${g.nome}</div>`
-      + `<div class="ficheiro-meta">${g.grupo.ficheiros.length} PDF(s) · ${nRegistos} registo(s)</div>`;
+      + `<div class="ficheiro-meta">${g.grupo.ficheiros.length} ficheiro(s) · ${nRegistos} registo(s)</div>`;
 
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -362,3 +464,5 @@ $('btn-zip').addEventListener('click', async () => {
   const blob = await zip.generateAsync({ type: 'blob' });
   descarregar(blob, 'Relatorios.zip');
 });
+
+aplicarFonte();
