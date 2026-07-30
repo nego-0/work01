@@ -35,6 +35,9 @@ export const COLUNA_ORIGEM = 'Ficheiro (PDF)';
 /** Nº total de colunas da tabela de dados. */
 const N_COLUNAS = COLUNAS.length + 1;
 
+/** Coluna onde começa o bloco "Estatísticas por Tipo", ao lado dos técnicos. */
+const COL_TIPO = 6;
+
 const COR_TITULO = 'FF1F3864';
 const COR_SECCAO = 'FF2E75B6';
 const COR_CABECALHO = 'FFD9E2F3';
@@ -71,16 +74,16 @@ function tituloSeccao(ws, linha, texto, nota) {
   return linha + 1;
 }
 
-function linhaCabecalho(ws, linha, valores) {
+function linhaCabecalho(ws, linha, valores, colInicial = 1) {
   const row = ws.getRow(linha);
   valores.forEach((v, i) => {
-    const cell = row.getCell(i + 1);
+    const cell = row.getCell(colInicial + i);
     cell.value = v;
     cell.font = { bold: true };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_CABECALHO } };
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
   });
-  aplicarBorda(row, 1, valores.length);
+  aplicarBorda(row, colInicial, colInicial + valores.length - 1);
   return linha + 1;
 }
 
@@ -138,26 +141,21 @@ function construirFolhaRelatorio(ws, params) {
   linha = tituloSeccao(
     ws,
     linha,
-    'TÉCNICOS — DEFINIR O TIPO [7] EM FUNÇÃO DO TÉCNICO [6]',
+    'TÉCNICOS [6] E TIPOS [7]',
     'Escreva o nome do técnico e o tipo correspondente nas células amarelas. '
       + 'Na tabela de dados basta escolher o técnico: o tipo é preenchido automaticamente e '
       + 'as estatísticas actualizam-se.'
   );
+  // Os dois blocos ficam lado a lado para a tabela de dados começar mais acima.
   const linhaTecCab = linha;
-  linha = linhaCabecalho(ws, linha, ['Técnico [6]', 'Tipo [7]', 'Nº de Processos', 'Total das Taxas']);
+  linhaCabecalho(ws, linha, ['Técnico [6]', 'Tipo [7]', 'Nº de Processos', 'Total das Taxas']);
+  linha = linhaCabecalho(ws, linha, ['Tipo [7]', 'Nº de Processos', 'Total das Taxas'], COL_TIPO);
+  const linhaTipoCab = linhaTecCab;
   const primTec = linha;
   const ultTec = primTec + nLinhasTec - 1;
-  linha = ultTec + 1;
-  linha += 1;
-
-  const linhaTipoTitulo = linha;
-  linha = tituloSeccao(ws, linha, 'ESTATÍSTICAS POR TIPO [7]');
-  const linhaTipoCab = linha;
-  linha = linhaCabecalho(ws, linha, ['Tipo [7]', 'Nº de Processos', 'Total das Taxas']);
-  const primTipo = linha;
-  const ultTipo = primTipo + nLinhasTec - 1;
-  linha = ultTipo + 1;
-  linha += 1;
+  const primTipo = primTec;
+  const ultTipo = ultTec;
+  linha = ultTec + 2;
 
   const linhaDadosTitulo = linha;
   linha = tituloSeccao(
@@ -247,25 +245,30 @@ function construirFolhaRelatorio(ws, params) {
     aplicarBorda(row, 1, 4);
   }
 
-  /* ---- Secção 3: Estatísticas por tipo --------------------------- */
+  /* ---- Secção 3: Estatísticas por tipo (ao lado dos técnicos) ---- */
+  const letraTipo = String.fromCharCode(64 + COL_TIPO); // coluna do tipo, ex.: 'F'
   for (let i = 0; i < nLinhasTec; i++) {
     const r = primTipo + i;
     const rMapa = primTec + i;
     const row = ws.getRow(r);
 
     // Lista de tipos distintos: mostra o valor apenas na 1ª ocorrência.
-    row.getCell(1).value = {
+    row.getCell(COL_TIPO).value = {
       formula:
         `IF($B${rMapa}="","",IF(COUNTIF($B$${primTec}:$B${rMapa},$B${rMapa})=1,$B${rMapa},""))`,
     };
-    row.getCell(2).value = { formula: `IF($A${r}="","",COUNTIF(${R.tipo},$A${r}))` };
-    row.getCell(3).value = { formula: `IF($A${r}="","",SUMIF(${R.tipo},$A${r},${R.total}))` };
-    row.getCell(2).numFmt = '#,##0';
-    row.getCell(3).numFmt = '#,##0';
-    for (let c = 1; c <= 3; c++) {
+    row.getCell(COL_TIPO + 1).value = {
+      formula: `IF($${letraTipo}${r}="","",COUNTIF(${R.tipo},$${letraTipo}${r}))`,
+    };
+    row.getCell(COL_TIPO + 2).value = {
+      formula: `IF($${letraTipo}${r}="","",SUMIF(${R.tipo},$${letraTipo}${r},${R.total}))`,
+    };
+    row.getCell(COL_TIPO + 1).numFmt = '#,##0';
+    row.getCell(COL_TIPO + 2).numFmt = '#,##0';
+    for (let c = COL_TIPO; c <= COL_TIPO + 2; c++) {
       row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_CALC } };
     }
-    aplicarBorda(row, 1, 3);
+    aplicarBorda(row, COL_TIPO, COL_TIPO + 2);
   }
 
   /* ---- Secção 4: Dados ------------------------------------------- */
@@ -310,11 +313,13 @@ function construirFolhaRelatorio(ws, params) {
     from: { row: linhaDadosCab, column: 1 },
     to: { row: ultDados, column: N_COLUNAS },
   };
-  ws.views = [{ state: 'frozen', ySplit: linhaDadosCab }];
+  // Sem congelar linhas: um painel fixo tão alto tapava o ecrã e impedia
+  // a rolagem até aos dados.
+  ws.views = [{ state: 'normal' }];
 
   return {
     linhaResumoTitulo, linhaResumoCab, linhaTecTitulo, linhaTecCab,
-    linhaTipoTitulo, linhaTipoCab, linhaDadosTitulo, linhaDadosCab,
+    linhaTipoCab, linhaDadosTitulo, linhaDadosCab,
     primDados, ultDados, primTec, ultTec, primTipo, ultTipo,
   };
 }

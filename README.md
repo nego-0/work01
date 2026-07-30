@@ -73,12 +73,15 @@ A folha **Relatório** tem as estatísticas no topo e os dados por baixo:
 
 1. **Resumo** — total de processos e de taxas, contagem e soma por período,
    e quantos processos ainda estão por atribuir.
-2. **Técnicos** — a área editável (células amarelas) onde se escreve o nome do
-   técnico e o tipo correspondente. Ao lado, quantos processos cada técnico
-   executou e o total das taxas respectivo.
-3. **Estatísticas por Tipo** — quantidade e total de cada tipo, sem repetições.
-4. **Dados** — uma linha por processo, com as 7 colunas mais a coluna de origem,
-   filtro automático e painel fixo.
+2. **Técnicos e Tipos** — à esquerda, a área editável (células amarelas) onde se
+   escreve o nome do técnico e o tipo correspondente, com o nº de processos e o
+   total das taxas de cada um; à direita, a quantidade e o total de cada tipo,
+   sem repetições.
+3. **Dados** — uma linha por processo, com as 7 colunas mais a coluna de origem
+   e filtro automático.
+
+As estatísticas ocupam apenas as primeiras 30 linhas e não há painéis
+congelados, para a tabela de dados começar à vista e deslizar normalmente.
 
 Tudo assenta em fórmulas nativas: basta escolher o técnico numa linha de dados
 (há lista pendente) para o **Tipo** ser preenchido automaticamente e todas as
