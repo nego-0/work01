@@ -71,20 +71,23 @@ Relatorio_Consolidado.xlsx               (todos)
 
 A folha **Relatório** tem as estatísticas no topo e os dados por baixo:
 
-1. **Resumo** — à esquerda, o total de processos e de taxas, a contagem e soma por
-   período e quantos processos ainda estão por atribuir; à direita, as
-   estatísticas por **Estado**: quantos processos e que valor estão **Pago** e
-   **Não Pago**. A coluna Estado dos dados tem lista pendente com esses valores,
-   por isso basta mudar uma linha para as contagens acompanharem.
-2. **Técnicos e Tipos** — à esquerda, a área editável (células amarelas) onde se
-   escreve o nome do técnico e o tipo correspondente, com o nº de processos e o
-   total das taxas de cada um; à direita, a quantidade e o total de cada tipo,
-   sem repetições.
+1. **Resumo**, com três blocos lado a lado:
+   - **Indicadores** — total de processos e de taxas, contagem e soma por período,
+     quantos já têm técnico e quantos faltam;
+   - **Estado [4]** — quantos processos e que valor estão **Pago** e **Não Pago**
+     (a coluna Estado dos dados tem lista pendente com esses valores);
+   - **Tipo [7]** — quantidade e total de cada tipo, sem repetições, mais uma
+     linha *Outros tipos* que garante que nada fica de fora.
+2. **Técnicos** — a área editável (células amarelas) onde se escreve o nome do
+   técnico e o tipo correspondente, com o nº de processos e o total das taxas de
+   cada um. As linhas estão repartidas em **duas metades lado a lado** (por
+   omissão 6 + 6).
 3. **Dados** — uma linha por processo, com as 7 colunas mais a coluna de origem
    e filtro automático.
 
-As estatísticas ocupam apenas as primeiras 30 linhas e não há painéis
-congelados, para a tabela de dados começar à vista e deslizar normalmente.
+Tudo o que está acima da tabela — incluindo o cabeçalho das colunas — fica
+**congelado**: as estatísticas continuam à vista enquanto se percorre a tabela.
+A folha abre a 90% de zoom para esse topo caber mesmo em ecrãs baixos.
 
 Tudo assenta em fórmulas nativas: basta escolher o técnico numa linha de dados
 (há lista pendente) para o **Tipo** ser preenchido automaticamente e todas as
@@ -119,9 +122,10 @@ exactamente os mesmos registos, nas colunas e ordem pedidas.
 
 Confirma ainda, PDF a PDF, que todas as linhas de cada ficheiro chegaram ao Excel
 (17 + 52 + 50 + 35 + 54 nos exemplos), que não há linhas repetidas nem agregadas, e
-que o bloco de estados e a lista pendente Pago / Não Pago estão no sítio.
+que os blocos de estados e de tipos, as listas pendentes e o congelamento do
+topo estão no sítio.
 
-Nos 5 PDFs de exemplo (208 processos) passaram as 108 verificações, e o resultado foi
+Nos 5 PDFs de exemplo (208 processos) passaram as 126 verificações, e o resultado foi
 ainda confrontado, linha a linha, com uma extracção feita por um método totalmente
 diferente (leitura ao nível do caractere): **208/208 registos iguais**.
 
