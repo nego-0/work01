@@ -1,0 +1,4 @@
+node_modules/
+saida/
+*.log
+.DS_Store

@@ -1,0 +1,16 @@
+{
+  "name": "posto-modelos-relatorios",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Preenchimento de modelos de documentos e produção automática de relatórios do Posto Aduaneiro",
+  "scripts": {
+    "build": "node tools/construir.mjs",
+    "start": "npx --yes http-server -p 8080 -c-1 .",
+    "cli": "node tools/gerar-cli.mjs",
+    "test": "node tests/verificar.mjs"
+  },
+  "devDependencies": {
+    "jszip": "^3.10.1"
+  }
+}
