@@ -240,12 +240,20 @@ export function extractRowsFromPage(items) {
     // O total é a última palavra numérica da coluna: se o nome do destinatário
     // transbordou, as palavras do nome ficam antes do valor.
     const numerico = totalTxt.split(/\s+/).filter((t) => /^[\d.,]+$/.test(t)).pop();
+    const totalTaxas = parseAmount(numerico);
+
+    // Assinala uma leitura duvidosa, para a interface poder avisar e deixar
+    // corrigir à mão. Não deita a linha fora — mostra-a com o problema.
+    const problema = totalTaxas == null || totalTaxas <= 0
+      ? 'Total das Taxas não reconhecido'
+      : null;
 
     rows.push({
       numeroDU: duTxt,
       dataReg: data.iso,
-      totalTaxas: parseAmount(numerico),
+      totalTaxas,
       totalTaxasTexto: totalTxt,
+      ...(problema ? { problema } : {}),
     });
   }
 

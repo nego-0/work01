@@ -9,6 +9,10 @@
   --amarelo: #fff2cc;
   --verde: #1e7d45;
   --vermelho: #b3261e;
+  --laranja: #b26a00;
+  --laranja-fundo: #fff4e2;
+  --laranja-borda: #f2d09a;
+  --sombra: 0 1px 2px rgba(20, 35, 60, .05), 0 4px 16px rgba(20, 35, 60, .05);
   --raio: 10px;
 }
 
@@ -43,6 +47,7 @@ main { padding: 24px 0 40px; }
   border-radius: var(--raio);
   padding: 20px 22px;
   margin-bottom: 20px;
+  box-shadow: var(--sombra);
 }
 .cartao h2 { margin: 0 0 14px; font-size: 1.15rem; display: flex; align-items: center; gap: 10px; }
 .cartao h3 { margin: 22px 0 6px; font-size: 1rem; }
@@ -74,22 +79,53 @@ code { background: #eef1f6; padding: 1px 5px; border-radius: 4px; font-size: .85
 .zona-icone { font-size: 2rem; }
 
 /* Lista de ficheiros ---------------------------------------------- */
-.lista { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.lista { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+.ficheiro-bloco {
+  border: 1px solid var(--borda); border-radius: 8px; overflow: hidden;
+  background: #fdfefe;
+}
 .ficheiro {
   display: flex; align-items: center; gap: 12px;
-  border: 1px solid var(--borda); border-left: 4px solid var(--verde);
-  border-radius: 8px; padding: 10px 12px; background: #fdfefe;
+  border-left: 4px solid var(--verde);
+  padding: 10px 12px;
 }
 .ficheiro.com-erro { border-left-color: var(--vermelho); background: #fff8f7; }
+.ficheiro.com-aviso { border-left-color: var(--laranja); background: var(--laranja-fundo); }
 .ficheiro-info { flex: 1; min-width: 0; }
 .ficheiro-nome { font-weight: 600; word-break: break-all; }
 .ficheiro-meta { color: var(--texto-suave); font-size: .85rem; }
+.ficheiro-acoes { display: flex; align-items: center; gap: 4px; flex: none; }
 
 .btn-remover {
   border: none; background: transparent; color: var(--texto-suave);
   font-size: 1rem; cursor: pointer; padding: 4px 8px; border-radius: 6px;
 }
 .btn-remover:hover { background: #f0f2f6; color: var(--vermelho); }
+
+.btn-aviso {
+  border: 1px solid var(--laranja-borda); background: #fff; color: var(--laranja);
+  padding: 5px 12px; border-radius: 999px; font: inherit; font-weight: 600;
+  font-size: .82rem; cursor: pointer; white-space: nowrap;
+}
+.btn-aviso:hover { background: var(--laranja-fundo); }
+
+/* Correcção de leituras ------------------------------------------- */
+.painel-correccao {
+  border-top: 1px solid var(--laranja-borda);
+  background: #fffaf2; padding: 12px 14px;
+}
+.painel-correccao-nota { margin: 0 0 10px; font-size: .85rem; color: var(--texto); }
+.tabela-correccao { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.tabela-correccao th {
+  text-align: left; font-weight: 600; font-size: .78rem; color: var(--texto-suave);
+  padding: 2px 6px; border-bottom: 1px solid var(--laranja-borda);
+}
+.tabela-correccao td { padding: 4px 6px; vertical-align: middle; }
+.tabela-correccao input { width: 100%; min-width: 90px; }
+.tabela-correccao input.invalido {
+  border-color: var(--vermelho); outline-color: var(--vermelho); background: #fff5f4;
+}
+.tabela-correccao .coluna-problema { color: var(--laranja); font-size: .8rem; white-space: nowrap; }
 
 /* Formulário ------------------------------------------------------ */
 .grelha-config {
@@ -163,6 +199,8 @@ input[type="text"]:focus, input[type="number"]:focus {
 .aviso ul { margin: 0; padding-left: 20px; }
 .aviso-info { background: #eef5fd; border: 1px solid #cfe1f7; }
 .aviso-erro { background: #fdeceb; border: 1px solid #f5c6c2; color: var(--vermelho); }
+.aviso-atencao { background: var(--laranja-fundo); border: 1px solid var(--laranja-borda); color: var(--laranja); }
+.aviso-ok { background: #eaf6ef; border: 1px solid #c3e6d1; color: var(--verde); }
 
 /* Resultados ------------------------------------------------------ */
 .resultados { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }

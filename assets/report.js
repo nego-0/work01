@@ -171,6 +171,10 @@ function construirFolhaRelatorio(ws, params) {
   const linhaDadosCab = linhaDadosTitulo + 1;
   const primDados = linhaDadosCab + 1;
   const ultDados = primDados + Math.max(registos.length, 1) - 1;
+  // As estatísticas contam até à linha 999 (ou até ao fim dos dados, se forem
+  // mais). Assim, quem acrescentar linhas à mão não tem de mexer nas fórmulas.
+  const LIMITE_CALC = 999;
+  const ultCalc = Math.max(ultDados, LIMITE_CALC);
 
   /* ---- Colunas ---------------------------------------------------- */
   // As 8 primeiras servem a tabela de dados; as três tabelas de técnicos
@@ -219,14 +223,20 @@ function construirFolhaRelatorio(ws, params) {
   const nomesBloco = (b) => `$${colNomeBloco(b)}$${primTec}:$${colNomeBloco(b)}$${ultTec}`;
   const tiposBloco = (b) => `$${colTipoBloco(b)}$${primTec}:$${colTipoBloco(b)}$${ultTec}`;
   const mapaBloco = (b) => `$${colNomeBloco(b)}$${primTec}:$${colTipoBloco(b)}$${ultTec}`;
+  // Tipo de uma linha de dados: procura o técnico nas três tabelas, por
+  // intervalo (para aguentar linhas inseridas nas tabelas de técnicos).
+  const formulaTipo = (r) => {
+    const proc = (b) => `VLOOKUP($F${r},${mapaBloco(b)},2,FALSE)`;
+    return `IF($F${r}="","",IFERROR(${proc(0)},IFERROR(${proc(1)},IFERROR(${proc(2)},""))))`;
+  };
 
   const R = {
-    periodo: `$A$${primDados}:$A$${ultDados}`,
-    total: `$C$${primDados}:$C$${ultDados}`,
-    estado: `$D$${primDados}:$D$${ultDados}`,
-    du: `$E$${primDados}:$E$${ultDados}`,
-    tecnico: `$F$${primDados}:$F$${ultDados}`,
-    tipo: `$G$${primDados}:$G$${ultDados}`,
+    periodo: `$A$${primDados}:$A$${ultCalc}`,
+    total: `$C$${primDados}:$C$${ultCalc}`,
+    estado: `$D$${primDados}:$D$${ultCalc}`,
+    du: `$E$${primDados}:$E$${ultCalc}`,
+    tecnico: `$F$${primDados}:$F$${ultCalc}`,
+    tipo: `$G$${primDados}:$G$${ultCalc}`,
     mapaNomes: `$${A}$1:$${A}$${nTec}`,
     mapaTipos: `$${B}$1:$${B}$${nTec}`,
     mapaOrdem: `$${C}$1:$${C}$${nTec}`,
@@ -281,13 +291,13 @@ function construirFolhaRelatorio(ws, params) {
   const somaComTecnico = `SUMPRODUCT((${R.tecnico}<>"")*${R.total})`;
   colunas.push({
     titulo: 'Com técnico',
-    n: `COUNTA(${R.du})-COUNTBLANK(${R.tecnico})`,
+    n: `SUMPRODUCT((${R.du}<>"")*(${R.tecnico}<>""))`,
     soma: somaComTecnico,
     grupo: 'atribuicao',
   });
   colunas.push({
     titulo: 'Por atribuir',
-    n: `COUNTBLANK(${R.tecnico})`,
+    n: `SUMPRODUCT((${R.du}<>"")*(${R.tecnico}=""))`,
     soma: `SUM(${R.total})-${somaComTecnico}`,
     grupo: 'atribuicao',
   });
@@ -437,20 +447,22 @@ function construirFolhaRelatorio(ws, params) {
     // um relatório anterior.
     row.getCell(6).value = reg.tecnico || null;
     row.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_INPUT } };
-    // Tipo procurado nas três tabelas, uma a seguir à outra; como cada uma é
-    // um intervalo, inserir linhas numa tabela não parte esta procura.
-    const proc = (b) => `VLOOKUP($F${r},${mapaBloco(b)},2,FALSE)`;
-    row.getCell(7).value = {
-      formula: `IF($F${r}="","",IFERROR(${proc(0)},IFERROR(${proc(1)},IFERROR(${proc(2)},""))))`,
-    };
+    row.getCell(7).value = { formula: formulaTipo(r) };
     row.getCell(8).value = reg.ficheiro || '';
     row.getCell(8).font = { size: 9, color: { argb: 'FF595959' } };
     aplicarBorda(row, 1, N_COLUNAS);
   });
 
+  // Linhas livres até 999: só a fórmula do Tipo e a cor de entrada no Técnico,
+  // para quem acrescentar dados à mão ter o Tipo automático e a lista pendente.
+  for (let r = ultDados + 1; r <= ultCalc; r++) {
+    ws.getCell(r, 6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_INPUT } };
+    ws.getCell(r, 7).value = { formula: formulaTipo(r) };
+  }
+
   /* ---- Acabamentos ----------------------------------------------- */
   // Lista pendente na coluna Técnico, com os nomes dos dois lados.
-  ws.dataValidations.add(`F${primDados}:F${ultDados}`, {
+  ws.dataValidations.add(`F${primDados}:F${ultCalc}`, {
     type: 'list',
     allowBlank: true,
     formulae: [R.mapaNomes],
@@ -458,7 +470,7 @@ function construirFolhaRelatorio(ws, params) {
   });
 
   // Lista pendente na coluna Estado, para marcar um processo como não pago.
-  ws.dataValidations.add(`D${primDados}:D${ultDados}`, {
+  ws.dataValidations.add(`D${primDados}:D${ultCalc}`, {
     type: 'list',
     allowBlank: true,
     formulae: [`"${estados.join(',')}"`],
@@ -606,7 +618,7 @@ export async function criarWorkbook(ExcelJS, grupo, opcoes = {}) {
 
   // Quando os registos já vêm juntos (junção de relatórios, com as
   // redundâncias resolvidas), usam-se tal como estão.
-  const registos = opcoes.registos || grupo.ficheiros.flatMap((f) => f.registos.map((r) => ({
+  const registos = (opcoes.registos || grupo.ficheiros.flatMap((f) => f.registos.map((r) => ({
     periodo: r.periodo || f.periodo,
     dataReg: r.dataReg,
     totalTaxas: r.totalTaxas,
@@ -614,8 +626,14 @@ export async function criarWorkbook(ExcelJS, grupo, opcoes = {}) {
     estado: r.estado,
     tecnico: r.tecnico,
     ficheiro: r.ficheiro || f.nome,
-  })));
-  // Sem ordenação: as linhas ficam na ordem em que aparecem nos PDFs.
+  })))).slice();
+  // Ordem ascendente de Data de Reg. (as datas ISO comparam-se como texto).
+  // O sort é estável, por isso, dentro do mesmo dia, mantém-se a ordem original.
+  registos.sort((a, b) => {
+    const da = a.dataReg || '9999-99-99';
+    const db = b.dataReg || '9999-99-99';
+    return da < db ? -1 : da > db ? 1 : 0;
+  });
 
   const nomes = grupo.ficheiros.map((f) => f.nome).join(' · ');
   const ws = wb.addWorksheet('Relatório', {

@@ -17,6 +17,10 @@
   --amarelo: #fff2cc;
   --verde: #1e7d45;
   --vermelho: #b3261e;
+  --laranja: #b26a00;
+  --laranja-fundo: #fff4e2;
+  --laranja-borda: #f2d09a;
+  --sombra: 0 1px 2px rgba(20, 35, 60, .05), 0 4px 16px rgba(20, 35, 60, .05);
   --raio: 10px;
 }
 
@@ -51,6 +55,7 @@ main { padding: 24px 0 40px; }
   border-radius: var(--raio);
   padding: 20px 22px;
   margin-bottom: 20px;
+  box-shadow: var(--sombra);
 }
 .cartao h2 { margin: 0 0 14px; font-size: 1.15rem; display: flex; align-items: center; gap: 10px; }
 .cartao h3 { margin: 22px 0 6px; font-size: 1rem; }
@@ -82,22 +87,53 @@ code { background: #eef1f6; padding: 1px 5px; border-radius: 4px; font-size: .85
 .zona-icone { font-size: 2rem; }
 
 /* Lista de ficheiros ---------------------------------------------- */
-.lista { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.lista { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+.ficheiro-bloco {
+  border: 1px solid var(--borda); border-radius: 8px; overflow: hidden;
+  background: #fdfefe;
+}
 .ficheiro {
   display: flex; align-items: center; gap: 12px;
-  border: 1px solid var(--borda); border-left: 4px solid var(--verde);
-  border-radius: 8px; padding: 10px 12px; background: #fdfefe;
+  border-left: 4px solid var(--verde);
+  padding: 10px 12px;
 }
 .ficheiro.com-erro { border-left-color: var(--vermelho); background: #fff8f7; }
+.ficheiro.com-aviso { border-left-color: var(--laranja); background: var(--laranja-fundo); }
 .ficheiro-info { flex: 1; min-width: 0; }
 .ficheiro-nome { font-weight: 600; word-break: break-all; }
 .ficheiro-meta { color: var(--texto-suave); font-size: .85rem; }
+.ficheiro-acoes { display: flex; align-items: center; gap: 4px; flex: none; }
 
 .btn-remover {
   border: none; background: transparent; color: var(--texto-suave);
   font-size: 1rem; cursor: pointer; padding: 4px 8px; border-radius: 6px;
 }
 .btn-remover:hover { background: #f0f2f6; color: var(--vermelho); }
+
+.btn-aviso {
+  border: 1px solid var(--laranja-borda); background: #fff; color: var(--laranja);
+  padding: 5px 12px; border-radius: 999px; font: inherit; font-weight: 600;
+  font-size: .82rem; cursor: pointer; white-space: nowrap;
+}
+.btn-aviso:hover { background: var(--laranja-fundo); }
+
+/* Correcção de leituras ------------------------------------------- */
+.painel-correccao {
+  border-top: 1px solid var(--laranja-borda);
+  background: #fffaf2; padding: 12px 14px;
+}
+.painel-correccao-nota { margin: 0 0 10px; font-size: .85rem; color: var(--texto); }
+.tabela-correccao { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.tabela-correccao th {
+  text-align: left; font-weight: 600; font-size: .78rem; color: var(--texto-suave);
+  padding: 2px 6px; border-bottom: 1px solid var(--laranja-borda);
+}
+.tabela-correccao td { padding: 4px 6px; vertical-align: middle; }
+.tabela-correccao input { width: 100%; min-width: 90px; }
+.tabela-correccao input.invalido {
+  border-color: var(--vermelho); outline-color: var(--vermelho); background: #fff5f4;
+}
+.tabela-correccao .coluna-problema { color: var(--laranja); font-size: .8rem; white-space: nowrap; }
 
 /* Formulário ------------------------------------------------------ */
 .grelha-config {
@@ -171,6 +207,8 @@ input[type="text"]:focus, input[type="number"]:focus {
 .aviso ul { margin: 0; padding-left: 20px; }
 .aviso-info { background: #eef5fd; border: 1px solid #cfe1f7; }
 .aviso-erro { background: #fdeceb; border: 1px solid #f5c6c2; color: var(--vermelho); }
+.aviso-atencao { background: var(--laranja-fundo); border: 1px solid var(--laranja-borda); color: var(--laranja); }
+.aviso-ok { background: #eaf6ef; border: 1px solid #c3e6d1; color: var(--verde); }
 
 /* Resultados ------------------------------------------------------ */
 .resultados { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
@@ -769,12 +807,20 @@ function extractRowsFromPage(items) {
     // O total é a última palavra numérica da coluna: se o nome do destinatário
     // transbordou, as palavras do nome ficam antes do valor.
     const numerico = totalTxt.split(/\s+/).filter((t) => /^[\d.,]+$/.test(t)).pop();
+    const totalTaxas = parseAmount(numerico);
+
+    // Assinala uma leitura duvidosa, para a interface poder avisar e deixar
+    // corrigir à mão. Não deita a linha fora — mostra-a com o problema.
+    const problema = totalTaxas == null || totalTaxas <= 0
+      ? 'Total das Taxas não reconhecido'
+      : null;
 
     rows.push({
       numeroDU: duTxt,
       dataReg: data.iso,
-      totalTaxas: parseAmount(numerico),
+      totalTaxas,
       totalTaxasTexto: totalTxt,
+      ...(problema ? { problema } : {}),
     });
   }
 
@@ -1025,6 +1071,10 @@ function construirFolhaRelatorio(ws, params) {
   const linhaDadosCab = linhaDadosTitulo + 1;
   const primDados = linhaDadosCab + 1;
   const ultDados = primDados + Math.max(registos.length, 1) - 1;
+  // As estatísticas contam até à linha 999 (ou até ao fim dos dados, se forem
+  // mais). Assim, quem acrescentar linhas à mão não tem de mexer nas fórmulas.
+  const LIMITE_CALC = 999;
+  const ultCalc = Math.max(ultDados, LIMITE_CALC);
 
   /* ---- Colunas ---------------------------------------------------- */
   // As 8 primeiras servem a tabela de dados; as três tabelas de técnicos
@@ -1073,14 +1123,20 @@ function construirFolhaRelatorio(ws, params) {
   const nomesBloco = (b) => `$${colNomeBloco(b)}$${primTec}:$${colNomeBloco(b)}$${ultTec}`;
   const tiposBloco = (b) => `$${colTipoBloco(b)}$${primTec}:$${colTipoBloco(b)}$${ultTec}`;
   const mapaBloco = (b) => `$${colNomeBloco(b)}$${primTec}:$${colTipoBloco(b)}$${ultTec}`;
+  // Tipo de uma linha de dados: procura o técnico nas três tabelas, por
+  // intervalo (para aguentar linhas inseridas nas tabelas de técnicos).
+  const formulaTipo = (r) => {
+    const proc = (b) => `VLOOKUP($F${r},${mapaBloco(b)},2,FALSE)`;
+    return `IF($F${r}="","",IFERROR(${proc(0)},IFERROR(${proc(1)},IFERROR(${proc(2)},""))))`;
+  };
 
   const R = {
-    periodo: `$A$${primDados}:$A$${ultDados}`,
-    total: `$C$${primDados}:$C$${ultDados}`,
-    estado: `$D$${primDados}:$D$${ultDados}`,
-    du: `$E$${primDados}:$E$${ultDados}`,
-    tecnico: `$F$${primDados}:$F$${ultDados}`,
-    tipo: `$G$${primDados}:$G$${ultDados}`,
+    periodo: `$A$${primDados}:$A$${ultCalc}`,
+    total: `$C$${primDados}:$C$${ultCalc}`,
+    estado: `$D$${primDados}:$D$${ultCalc}`,
+    du: `$E$${primDados}:$E$${ultCalc}`,
+    tecnico: `$F$${primDados}:$F$${ultCalc}`,
+    tipo: `$G$${primDados}:$G$${ultCalc}`,
     mapaNomes: `$${A}$1:$${A}$${nTec}`,
     mapaTipos: `$${B}$1:$${B}$${nTec}`,
     mapaOrdem: `$${C}$1:$${C}$${nTec}`,
@@ -1135,13 +1191,13 @@ function construirFolhaRelatorio(ws, params) {
   const somaComTecnico = `SUMPRODUCT((${R.tecnico}<>"")*${R.total})`;
   colunas.push({
     titulo: 'Com técnico',
-    n: `COUNTA(${R.du})-COUNTBLANK(${R.tecnico})`,
+    n: `SUMPRODUCT((${R.du}<>"")*(${R.tecnico}<>""))`,
     soma: somaComTecnico,
     grupo: 'atribuicao',
   });
   colunas.push({
     titulo: 'Por atribuir',
-    n: `COUNTBLANK(${R.tecnico})`,
+    n: `SUMPRODUCT((${R.du}<>"")*(${R.tecnico}=""))`,
     soma: `SUM(${R.total})-${somaComTecnico}`,
     grupo: 'atribuicao',
   });
@@ -1291,20 +1347,22 @@ function construirFolhaRelatorio(ws, params) {
     // um relatório anterior.
     row.getCell(6).value = reg.tecnico || null;
     row.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_INPUT } };
-    // Tipo procurado nas três tabelas, uma a seguir à outra; como cada uma é
-    // um intervalo, inserir linhas numa tabela não parte esta procura.
-    const proc = (b) => `VLOOKUP($F${r},${mapaBloco(b)},2,FALSE)`;
-    row.getCell(7).value = {
-      formula: `IF($F${r}="","",IFERROR(${proc(0)},IFERROR(${proc(1)},IFERROR(${proc(2)},""))))`,
-    };
+    row.getCell(7).value = { formula: formulaTipo(r) };
     row.getCell(8).value = reg.ficheiro || '';
     row.getCell(8).font = { size: 9, color: { argb: 'FF595959' } };
     aplicarBorda(row, 1, N_COLUNAS);
   });
 
+  // Linhas livres até 999: só a fórmula do Tipo e a cor de entrada no Técnico,
+  // para quem acrescentar dados à mão ter o Tipo automático e a lista pendente.
+  for (let r = ultDados + 1; r <= ultCalc; r++) {
+    ws.getCell(r, 6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_INPUT } };
+    ws.getCell(r, 7).value = { formula: formulaTipo(r) };
+  }
+
   /* ---- Acabamentos ----------------------------------------------- */
   // Lista pendente na coluna Técnico, com os nomes dos dois lados.
-  ws.dataValidations.add(`F${primDados}:F${ultDados}`, {
+  ws.dataValidations.add(`F${primDados}:F${ultCalc}`, {
     type: 'list',
     allowBlank: true,
     formulae: [R.mapaNomes],
@@ -1312,7 +1370,7 @@ function construirFolhaRelatorio(ws, params) {
   });
 
   // Lista pendente na coluna Estado, para marcar um processo como não pago.
-  ws.dataValidations.add(`D${primDados}:D${ultDados}`, {
+  ws.dataValidations.add(`D${primDados}:D${ultCalc}`, {
     type: 'list',
     allowBlank: true,
     formulae: [`"${estados.join(',')}"`],
@@ -1460,7 +1518,7 @@ async function criarWorkbook(ExcelJS, grupo, opcoes = {}) {
 
   // Quando os registos já vêm juntos (junção de relatórios, com as
   // redundâncias resolvidas), usam-se tal como estão.
-  const registos = opcoes.registos || grupo.ficheiros.flatMap((f) => f.registos.map((r) => ({
+  const registos = (opcoes.registos || grupo.ficheiros.flatMap((f) => f.registos.map((r) => ({
     periodo: r.periodo || f.periodo,
     dataReg: r.dataReg,
     totalTaxas: r.totalTaxas,
@@ -1468,8 +1526,14 @@ async function criarWorkbook(ExcelJS, grupo, opcoes = {}) {
     estado: r.estado,
     tecnico: r.tecnico,
     ficheiro: r.ficheiro || f.nome,
-  })));
-  // Sem ordenação: as linhas ficam na ordem em que aparecem nos PDFs.
+  })))).slice();
+  // Ordem ascendente de Data de Reg. (as datas ISO comparam-se como texto).
+  // O sort é estável, por isso, dentro do mesmo dia, mantém-se a ordem original.
+  registos.sort((a, b) => {
+    const da = a.dataReg || '9999-99-99';
+    const db = b.dataReg || '9999-99-99';
+    return da < db ? -1 : da > db ? 1 : 0;
+  });
 
   const nomes = grupo.ficheiros.map((f) => f.nome).join(' · ');
   const ws = wb.addWorksheet('Relatório', {
@@ -1999,8 +2063,14 @@ function desenharFicheiros() {
   );
 
   for (const f of ordenados) {
+    const problemas = f.registos ? f.registos.filter(temProblema) : [];
+
+    const bloco = document.createElement('div');
+    bloco.className = 'ficheiro-bloco';
+
     const div = document.createElement('div');
-    div.className = 'ficheiro' + (f.erro ? ' com-erro' : '');
+    div.className = 'ficheiro'
+      + (f.erro ? ' com-erro' : problemas.length ? ' com-aviso' : '');
 
     const info = document.createElement('div');
     info.className = 'ficheiro-info';
@@ -2032,9 +2102,22 @@ function desenharFicheiros() {
           `${f.tecnicos.length} técnico(s) no mapa`,
           `Taxas: ${taxas.toLocaleString('pt-PT')}`,
         ];
+      if (problemas.length) marcas.push(`⚠ ${problemas.length} por rever`);
       meta.textContent = marcas.join(' · ');
     }
     info.appendChild(meta);
+
+    const acoes = document.createElement('div');
+    acoes.className = 'ficheiro-acoes';
+
+    if (problemas.length) {
+      const rever = document.createElement('button');
+      rever.type = 'button';
+      rever.className = 'btn btn-aviso';
+      rever.textContent = f.aRever ? 'Fechar' : `Corrigir ${problemas.length}`;
+      rever.addEventListener('click', () => { f.aRever = !f.aRever; desenharFicheiros(); });
+      acoes.appendChild(rever);
+    }
 
     const remover = document.createElement('button');
     remover.type = 'button';
@@ -2045,16 +2128,151 @@ function desenharFicheiros() {
       estado.ficheiros = estado.ficheiros.filter((x) => x.id !== f.id);
       desenharFicheiros();
     });
+    acoes.appendChild(remover);
 
-    div.appendChild(info);
-    div.appendChild(remover);
-    lista.appendChild(div);
+    div.append(info, acoes);
+    bloco.appendChild(div);
+    if (f.aRever && problemas.length) bloco.appendChild(painelCorreccao(f));
+    lista.appendChild(bloco);
   }
 
   const temDados = estado.ficheiros.some((f) => f.registos && f.registos.length)
     || (estado.base && estado.base.registos && estado.base.registos.length);
   $('btn-gerar').disabled = !temDados;
+
+  // Acrescenta à lista os técnicos que só aparecem nos dados.
+  estado.tecnicosAcrescentados = sincronizarTecnicosDosDados();
   mostrarPrevisao();
+}
+
+/* ------------------------------------------------------------------ */
+/* Erros de leitura — aviso e correcção manual pela interface          */
+/* ------------------------------------------------------------------ */
+
+/** Escapa texto para poder ser interpolado em innerHTML com segurança. */
+function escaparHtml(txt) {
+  return String(txt).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+/** Uma linha está por rever quando falta o essencial ou o total é duvidoso. */
+function temProblema(r) {
+  return !!(
+    r.problema
+    || r.totalTaxas == null
+    || r.totalTaxas <= 0
+    || !r.dataReg
+    || !String(r.numeroDU || '').trim()
+  );
+}
+
+/** Reavalia o campo `problema` de um registo depois de uma edição manual. */
+function reavaliarProblema(r) {
+  if (!String(r.numeroDU || '').trim()) r.problema = 'Nº do DU em falta';
+  else if (!r.dataReg) r.problema = 'Data de Reg. em falta';
+  else if (r.totalTaxas == null || r.totalTaxas <= 0) r.problema = 'Total das Taxas por confirmar';
+  else delete r.problema;
+}
+
+/** "01.07.2026", "1/7/2026" ou "2026-07-01" -> ISO; '' se não for data. */
+function dataPtParaIso(texto) {
+  const s = String(texto || '').trim();
+  if (!s) return '';
+  let m = /^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})$/.exec(s);
+  if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+  m = /^(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})$/.exec(s);
+  if (m) return `${m[3]}-${String(m[2]).padStart(2, '0')}-${String(m[1]).padStart(2, '0')}`;
+  return '';
+}
+
+/**
+ * Painel com as linhas por rever de um ficheiro, editáveis à mão. Cada campo
+ * actualiza o registo em directo; ao sair do campo, a lista é redesenhada e as
+ * linhas que ficaram completas saem do aviso.
+ */
+function painelCorreccao(f) {
+  const painel = document.createElement('div');
+  painel.className = 'painel-correccao';
+
+  const nota = document.createElement('p');
+  nota.className = 'painel-correccao-nota';
+  nota.innerHTML = '⚠ <strong>Leituras por rever.</strong> Confirme os valores com o PDF '
+    + 'original. Cada linha sai do aviso assim que ficar completa.';
+  painel.appendChild(nota);
+
+  const tabela = document.createElement('table');
+  tabela.className = 'tabela-correccao';
+  tabela.innerHTML = '<thead><tr>'
+    + '<th>Nº do DU</th><th>Data (dd.mm.aaaa)</th><th>Total das Taxas</th>'
+    + '<th>Período</th><th>Por rever</th></tr></thead>';
+  const corpo = document.createElement('tbody');
+  tabela.appendChild(corpo);
+
+  const campo = (valor, aoEditar, extra = {}) => {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = valor;
+    if (extra.placeholder) input.placeholder = extra.placeholder;
+    if (extra.titulo) input.title = extra.titulo;
+    input.addEventListener('input', () => aoEditar(input));
+    // Ao sair do campo, redesenha a lista de ficheiros (as linhas já completas
+    // desaparecem do aviso e as contagens actualizam-se).
+    input.addEventListener('change', () => desenharFicheiros());
+    return input;
+  };
+
+  const desenhar = () => {
+    corpo.innerHTML = '';
+    const porRever = f.registos.filter(temProblema);
+    for (const r of porRever) {
+      const tr = document.createElement('tr');
+      const tdProb = document.createElement('td');
+      tdProb.className = 'coluna-problema';
+      const marcarProblema = () => { tdProb.textContent = r.problema || ''; };
+
+      const tdDU = document.createElement('td');
+      tdDU.appendChild(campo(r.numeroDU || '', (input) => {
+        r.numeroDU = input.value.trim();
+        reavaliarProblema(r);
+        marcarProblema();
+      }, { placeholder: 'Nº do DU' }));
+
+      const tdData = document.createElement('td');
+      const inData = campo(r.dataReg ? formatDatePt(r.dataReg) : '', (input) => {
+        const iso = dataPtParaIso(input.value);
+        r.dataReg = iso || '';
+        input.classList.toggle('invalido', !!input.value.trim() && !iso);
+        reavaliarProblema(r);
+        marcarProblema();
+      }, { placeholder: 'dd.mm.aaaa' });
+      tdData.appendChild(inData);
+
+      const tdTotal = document.createElement('td');
+      const inTotal = campo(r.totalTaxas != null ? String(r.totalTaxas) : '', (input) => {
+        const n = parseAmount(input.value);
+        r.totalTaxas = n;
+        input.classList.toggle('invalido', !!input.value.trim() && n == null);
+        reavaliarProblema(r);
+        marcarProblema();
+      }, {
+        placeholder: '0',
+        titulo: r.totalTaxasTexto ? `Lido do PDF: "${r.totalTaxasTexto}"` : '',
+      });
+      tdTotal.appendChild(inTotal);
+
+      const tdPer = document.createElement('td');
+      tdPer.textContent = r.periodo || f.periodo || '—';
+
+      marcarProblema();
+      tr.append(tdDU, tdData, tdTotal, tdPer, tdProb);
+      corpo.appendChild(tr);
+    }
+  };
+
+  desenhar();
+  painel.appendChild(tabela);
+  return painel;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2153,18 +2371,64 @@ $('btn-limpar-tecnicos').addEventListener('click', () => {
 
 mostrarTecnicos(tecnicosGuardados() || TECNICOS_PREDEFINIDOS);
 
-/** Técnicos do formulário mais os que vierem dos relatórios carregados. */
-function tecnicosParaOsFicheiros() {
-  const doFormulario = lerTecnicosDoFormulario();
-  const comMapa = [estado.base, ...estado.ficheiros].filter((f) => f && f.tecnicos?.length);
-  const dosRelatorios = juntarTecnicos(comMapa);
-  const juntos = [...doFormulario];
-  const vistos = new Set(doFormulario.map((t) => t.nome.toLowerCase()));
-  for (const t of dosRelatorios) {
-    if (vistos.has(t.nome.toLowerCase())) continue;
-    vistos.add(t.nome.toLowerCase());
-    juntos.push(t);
+/** Todos os ficheiros com dados carregados (consolidado base incluído). */
+function ficheirosComDados() {
+  return [estado.base, ...estado.ficheiros].filter((f) => f && f.registos?.length);
+}
+
+/**
+ * Técnicos que aparecem na coluna Técnico dos dados mas ainda não estão na
+ * lista. Devolve { nome, tipo } — o tipo vem do registo, se lá estiver.
+ *
+ * @param {Set<string>} jaConhecidos nomes já na lista (em minúsculas)
+ */
+function tecnicosNovosDosDados(jaConhecidos) {
+  const novos = new Map();
+  for (const f of ficheirosComDados()) {
+    for (const r of f.registos) {
+      const nome = (r.tecnico || '').trim();
+      if (!nome) continue;
+      const chave = nome.toLowerCase();
+      if (jaConhecidos.has(chave) || novos.has(chave)) continue;
+      novos.set(chave, { nome, tipo: (r.tipo || '').trim() });
+    }
   }
+  return [...novos.values()];
+}
+
+/**
+ * Acrescenta à lista visível os técnicos que aparecem nos dados e ainda lá não
+ * estão. Devolve os nomes acrescentados (para a interface poder avisar).
+ */
+function sincronizarTecnicosDosDados() {
+  const atuais = new Set(lerTecnicosDoFormulario().map((t) => t.nome.toLowerCase()));
+  const novos = tecnicosNovosDosDados(atuais);
+  if (!novos.length) return [];
+  for (const t of novos) adicionarLinhaTecnico(t.nome, t.tipo || '');
+  guardarTecnicos();
+  actualizarContagem();
+  return novos.map((t) => t.nome);
+}
+
+/**
+ * Técnicos a escrever nas tabelas de cada Excel: os do formulário, mais os dos
+ * relatórios carregados, mais os que só aparecem nos dados (acrescentados
+ * automaticamente, para nenhum processo ficar com um técnico fora da lista).
+ */
+function tecnicosParaOsFicheiros() {
+  const juntos = [...lerTecnicosDoFormulario()];
+  const vistos = new Set(juntos.map((t) => t.nome.toLowerCase()));
+  const acrescentar = (lista) => {
+    for (const t of lista) {
+      const chave = t.nome.toLowerCase();
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      juntos.push(t);
+    }
+  };
+  const comMapa = ficheirosComDados().filter((f) => f.tecnicos?.length);
+  acrescentar(juntarTecnicos(comMapa));
+  acrescentar(tecnicosNovosDosDados(vistos));
   return juntos;
 }
 
@@ -2256,6 +2520,31 @@ function mostrarPrevisao() {
     caixa.innerHTML = `<p>Serão gerados <strong>${linhas.length}</strong> ficheiro(s) Excel:</p>`
       + `<ul>${linhas.join('')}</ul>`;
     caixas.push(caixa);
+  }
+
+  // Ficheiros com leituras por rever — a corrigir antes de gerar.
+  const comProblemas = [...validos, ...(temBase ? [estado.base] : [])]
+    .map((f) => ({ f, n: (f.registos || []).filter(temProblema).length }))
+    .filter((x) => x.n);
+  if (comProblemas.length) {
+    const total = comProblemas.reduce((a, x) => a + x.n, 0);
+    const caixa = document.createElement('div');
+    caixa.className = 'aviso aviso-atencao';
+    caixa.innerHTML = `<p>⚠ <strong>${total}</strong> leitura(s) por rever em `
+      + `<strong>${comProblemas.length}</strong> ficheiro(s). Use o botão `
+      + '<em>Corrigir</em> em cada ficheiro assinalado para acertar os valores antes de gerar.</p>';
+    caixas.unshift(caixa);
+  }
+
+  // Técnicos que apareceram nos dados e foram acrescentados à lista.
+  const acrescentados = estado.tecnicosAcrescentados || [];
+  if (acrescentados.length) {
+    const caixa = document.createElement('div');
+    caixa.className = 'aviso aviso-ok';
+    caixa.innerHTML = `<p>➕ <strong>${acrescentados.length}</strong> técnico(s) `
+      + 'dos dados foram acrescentados à lista automaticamente: '
+      + `${acrescentados.map(escaparHtml).join(', ')}.</p>`;
+    caixas.unshift(caixa);
   }
 
   for (const c of caixas) alvo.appendChild(c);

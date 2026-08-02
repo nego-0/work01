@@ -17,8 +17,9 @@
  *      vizinhas), confirmando que não houve troca de colunas.
  *   5. A Data de Reg. de cada registo coincide com a data do nome do ficheiro.
  *   6. Não há Nº do DU repetido dentro do mesmo ficheiro.
- *   7. O Excel gerado contém exactamente os mesmos registos, nas 7 colunas e
- *      na ordem pedidas, com Estado preenchido, Técnico vazio e Tipo em fórmula.
+ *   7. O Excel gerado contém exactamente os mesmos registos, nas 7 colunas
+ *      pedidas e por ordem ascendente de data, com Estado preenchido, Técnico
+ *      vazio e Tipo em fórmula.
  *   8. Cada PDF contribui com todas as suas linhas: uma linha por processo, sem
  *      agregações nem repetições, e cada linha identifica o PDF de origem.
  *   9. O resumo cabe em duas linhas (nº de processos e total das taxas), com uma
@@ -290,6 +291,29 @@ for (const g of [...grupos, { datas: [], ficheiros, rotulo: 'Consolidado', conso
     'todas as células do resumo são fórmulas'
   );
 
+  // o resumo conta muito além dos dados (linha 999), para quem acrescentar
+  // linhas à mão não ter de esticar as fórmulas.
+  const fTotal = String((ws.getCell(linhaResumoN, 2).value || {}).formula || '');
+  const mLimite = fTotal.match(/:\$?[A-Z]\$?(\d+)\)/);
+  verificar(mLimite && Number(mLimite[1]) >= 999,
+    'o resumo conta até à linha 999 (dados acrescentados à mão contam sozinhos)', fTotal);
+  // "Por atribuir" usa SUMPRODUCT com máscara (du<>"")*(tecnico=""): as muitas
+  // linhas em branco entre os dados e a 999 não podem contar como por atribuir.
+  const formulasResumoN = [];
+  for (let c = 2; c <= 40; c++) {
+    const v = ws.getCell(linhaResumoN, c).value;
+    if (v === null || v === undefined) break;
+    formulasResumoN.push(String(v.formula || ''));
+  }
+  verificar(
+    formulasResumoN.some((f) => /SUMPRODUCT/.test(f) && /<>""/.test(f) && /=""/.test(f)),
+    'contagem "por atribuir" imune às linhas em branco até 999 (SUMPRODUCT)'
+  );
+  // as linhas livres até 999 já trazem a fórmula do Tipo, para o cálculo automático
+  const fTipoLivre = String((ws.getCell(999, 7).value || {}).formula || '');
+  verificar(/VLOOKUP/.test(fTipoLivre),
+    'linhas livres até 999 já trazem a fórmula do Tipo', fTipoLivre);
+
   // só o resumo fica congelado
   const vista = (ws.views || [])[0] || {};
   verificar(vista.state === 'frozen' && vista.ySplit === linhaResumoT,
@@ -399,18 +423,39 @@ for (const g of [...grupos, { datas: [], ficheiros, rotulo: 'Consolidado', conso
   verificar(lidos.every((l) => l.tipo && typeof l.tipo === 'object' && l.tipo.formula),
     'Tipo [7] calculado por fórmula a partir do Técnico');
 
-  // a ordem tem de ser exactamente a dos PDFs, sem reordenações
-  const sequenciaEsperada = grupo.ficheiros.flatMap((f) => f.registos.map((r) => String(r.numeroDU)));
-  const sequenciaLida = lidos.map((l) => l.du);
-  const primeiraDiferenca = sequenciaEsperada.findIndex((v, i) => v !== sequenciaLida[i]);
+  // a ordem tem de ser ascendente por Data de Reg.
+  const datasLidas = lidos.map((l) => l.dataReg);
+  const foraDeOrdem = datasLidas.findIndex((d, i) => i > 0 && datasLidas[i - 1] > d);
   verificar(
-    primeiraDiferenca === -1 && sequenciaLida.length === sequenciaEsperada.length,
-    'linhas na ordem exacta dos PDFs',
-    primeiraDiferenca >= 0
-      ? `posição ${primeiraDiferenca + 1}: esperado ${sequenciaEsperada[primeiraDiferenca]}, `
-        + `lido ${sequenciaLida[primeiraDiferenca]}`
-      : ''
+    foraDeOrdem === -1,
+    'linhas por ordem ascendente de Data de Reg.',
+    foraDeOrdem >= 0 ? `${datasLidas[foraDeOrdem - 1]} antes de ${datasLidas[foraDeOrdem]}` : ''
   );
+  // os mesmos processos, só reordenados: mesmo conjunto de (data|du)
+  const espSeq = grupo.ficheiros
+    .flatMap((f) => f.registos.map((r) => `${r.dataReg}|${r.numeroDU}`)).sort();
+  const lidSeq = lidos.map((l) => `${l.dataReg}|${l.du}`).sort();
+  verificar(
+    espSeq.length === lidSeq.length && espSeq.every((v, i) => v === lidSeq[i]),
+    'a reordenação não perde nem troca nenhum processo de dia'
+  );
+  // dentro de cada dia, mantém-se a ordem original dos PDFs (ordenação estável)
+  const seqPorDia = (pares) => {
+    const m = new Map();
+    for (const [data, du] of pares) {
+      if (!m.has(data)) m.set(data, []);
+      m.get(data).push(String(du));
+    }
+    return m;
+  };
+  const espDia = seqPorDia(grupo.ficheiros.flatMap((f) => f.registos.map((r) => [r.dataReg, r.numeroDU])));
+  const lidDia = seqPorDia(lidos.map((l) => [l.dataReg, l.du]));
+  let ordemEstavel = true;
+  for (const [data, seq] of espDia) {
+    const lida = lidDia.get(data) || [];
+    if (seq.length !== lida.length || seq.some((v, i) => v !== lida[i])) ordemEstavel = false;
+  }
+  verificar(ordemEstavel, 'dentro de cada dia mantém-se a ordem original dos PDFs');
 
   // separador de milhares e alinhamento do cabeçalho
   const fmt = ws.getCell(linhaResumoN, 2).numFmt || '';

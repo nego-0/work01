@@ -50,10 +50,19 @@ por esta ordem:
 | 7 | **Tipo** | fórmula: resulta do técnico escolhido |
 | — | **Ficheiro (PDF)** | coluna extra, a seguir às 7: de que PDF veio a linha |
 
-**Uma linha por processo, pela ordem dos PDFs.** Todos os processos de todos os
-PDFs do bloco vão para a tabela, sem agregações nem reordenações — a sequência é
-exactamente a do documento original. Cada linha tem a sua própria célula de
-**Técnico**, para se indicar quem foi o responsável por aquele processo.
+**Uma linha por processo, por ordem ascendente de data.** Todos os processos de
+todos os PDFs do bloco vão para a tabela, sem agregações — ordenados pela **Data
+de Reg.** e, dentro do mesmo dia, pela ordem do documento original. Cada linha tem
+a sua própria célula de **Técnico**, para se indicar quem foi o responsável por
+aquele processo.
+
+### Leituras por rever
+
+Se um total das taxas não for reconhecido, ou faltar a data ou o Nº do DU, a linha
+não é descartada: o ficheiro fica assinalado a laranja com um botão **Corrigir**,
+que abre uma pequena tabela onde se acertam à mão o Nº do DU, a data e o total,
+comparando com o PDF. A linha sai do aviso assim que ficar completa, e só depois se
+gera o Excel.
 
 ### Nomes dos ficheiros PDF
 
@@ -79,6 +88,11 @@ utilização para a outra; o botão *Repor lista predefinida* traz a original de
 volta. Estes nomes vão para as **três tabelas de técnicos** de cada Excel (8 por
 tabela por omissão) e alimentam a lista pendente da coluna Técnico. No Excel podem
 inserir-se mais linhas em qualquer tabela sem perder a lógica.
+
+Ao carregar dados — sobretudo ao juntar relatórios já preenchidos — os técnicos que
+aparecem nos dados e ainda não estão na lista são **acrescentados automaticamente**,
+para nenhum processo ficar com um responsável fora da lista. A interface avisa quais
+foram acrescentados.
 
 ## Origem dos dados
 
@@ -148,7 +162,11 @@ A folha **Relatório** tem as estatísticas no topo e os dados por baixo:
 
    É a **única parte congelada** da folha, por isso acompanha sempre a leitura da
    tabela. As colunas de tipo são preenchidas sozinhas com os tipos distintos
-   definidos nos técnicos, e *Outros tipos* garante que nada fica por contar.
+   definidos nos técnicos, e *Outros tipos* garante que nada fica por contar. As
+   contagens abrangem até à **linha 999**, por isso quem acrescentar processos à
+   mão por baixo dos dados vê as estatísticas actualizarem-se sem ter de mexer nas
+   fórmulas; essas linhas já trazem a fórmula do **Tipo** e a lista pendente do
+   Técnico.
 2. **Técnicos** — a área editável (células amarelas) com o nome do técnico e o
    tipo correspondente, mais o nº de processos e o total das taxas de cada um. São
    **três tabelas coladas lado a lado**, 8 linhas cada por omissão (24 técnicos).
@@ -211,7 +229,12 @@ Cobre também a junção: relatórios repetidos não duplicam linhas, cada polí
 mantém a versão certa, a ordem das fontes é respeitada e o mesmo Nº do DU noutra
 data conta como outro processo.
 
-Nos 5 PDFs de exemplo (208 processos) passaram as 185 verificações, e o resultado foi
+Confirma ainda a ordem ascendente por data (sem perder nem trocar processos de dia,
+mantendo dentro de cada dia a ordem original), que o resumo conta até à linha 999 sem
+que as linhas em branco falseiem a atribuição, e que as linhas livres já trazem a
+fórmula do Tipo.
+
+Nos 5 PDFs de exemplo (208 processos) passaram as 200 verificações, e o resultado foi
 ainda confrontado, linha a linha, com uma extracção feita por um método totalmente
 diferente (leitura ao nível do caractere): **208/208 registos iguais**.
 
