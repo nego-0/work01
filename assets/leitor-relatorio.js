@@ -86,8 +86,8 @@ export async function lerRelatorio(ExcelJS, buffer, nomeFicheiro = '') {
     for (let r = linhaTec + 1; r < linhaCab; r++) {
       // As faixas de secção ocupam a largura toda; a tabela de técnicos acaba aí.
       if (ws.getCell(r, 1).isMerged) break;
-      // As duas metades da tabela: à esquerda (A,B) e à direita (F,G).
-      for (const [colNome, colTipo] of [[1, 2], [6, 7]]) {
+      // As três tabelas coladas lado a lado: A,B — F,G — K,L.
+      for (const [colNome, colTipo] of [[1, 2], [6, 7], [11, 12]]) {
         const nome = texto(ws.getCell(r, colNome));
         if (!nome || nome === 'Técnico [6]' || vistos.has(nome.toLowerCase())) continue;
         vistos.add(nome.toLowerCase());

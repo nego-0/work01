@@ -76,8 +76,9 @@ de cada um pode ficar por definir.
 
 A lista fica guardada no navegador, por isso as alterações mantêm-se de uma
 utilização para a outra; o botão *Repor lista predefinida* traz a original de
-volta. Estes nomes vão para a área de configuração de cada Excel e alimentam a
-lista pendente da coluna Técnico.
+volta. Estes nomes vão para as **três tabelas de técnicos** de cada Excel (8 por
+tabela por omissão) e alimentam a lista pendente da coluna Técnico. No Excel podem
+inserir-se mais linhas em qualquer tabela sem perder a lógica.
 
 ## Origem dos dados
 
@@ -149,9 +150,16 @@ A folha **Relatório** tem as estatísticas no topo e os dados por baixo:
    tabela. As colunas de tipo são preenchidas sozinhas com os tipos distintos
    definidos nos técnicos, e *Outros tipos* garante que nada fica por contar.
 2. **Técnicos** — a área editável (células amarelas) com o nome do técnico e o
-   tipo correspondente, mais o nº de processos e o total das taxas de cada um. As
-   linhas estão repartidas em **duas metades lado a lado** (8 + 8 com a lista
-   predefinida). Rola com a folha.
+   tipo correspondente, mais o nº de processos e o total das taxas de cada um. São
+   **três tabelas coladas lado a lado**, 8 linhas cada por omissão (24 técnicos).
+   Rola com a folha.
+
+   Pode **inserir linhas** dentro de qualquer das três tabelas sem partir nada: as
+   fórmulas referem cada tabela por intervalo, por isso a contagem de processos, o
+   total das taxas e o **Tipo** de cada processo continuam certos, e o técnico novo
+   entra nas estatísticas do topo. Ao inserir uma linha, copie para ela as fórmulas
+   das colunas *Nº de Processos* e *Total das Taxas* (a folha de cálculo costuma
+   fazê-lo sozinha ao inserir entre linhas já preenchidas).
 3. **Dados** — uma linha por processo, com as 7 colunas mais a coluna de origem
    e filtro automático. Rola com a folha.
 
@@ -203,7 +211,7 @@ Cobre também a junção: relatórios repetidos não duplicam linhas, cada polí
 mantém a versão certa, a ordem das fontes é respeitada e o mesmo Nº do DU noutra
 data conta como outro processo.
 
-Nos 5 PDFs de exemplo (208 processos) passaram as 179 verificações, e o resultado foi
+Nos 5 PDFs de exemplo (208 processos) passaram as 185 verificações, e o resultado foi
 ainda confrontado, linha a linha, com uma extracção feita por um método totalmente
 diferente (leitura ao nível do caractere): **208/208 registos iguais**.
 

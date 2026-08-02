@@ -9,8 +9,8 @@
  *      coluna por indicador: total, cada período, atribuição, estados e tipos.
  *      É a única parte congelada da folha.
  *   2. Técnicos — área editável que define o Tipo [7] em função do Técnico [6]
- *      e mostra, por técnico, o nº de processos e o total das taxas, em duas
- *      metades lado a lado
+ *      e mostra, por técnico, o nº de processos e o total das taxas, em três
+ *      tabelas coladas lado a lado
  *   3. Dados: Período | Data de Reg. | Total das Taxas | Estado | Nº do DU |
  *             Técnico | Tipo | Ficheiro (PDF)
  *
@@ -37,8 +37,11 @@ export const COLUNA_ORIGEM = 'Ficheiro (PDF)';
 /** Nº total de colunas da tabela de dados. */
 const N_COLUNAS = COLUNAS.length + 1;
 
-/** Coluna onde começa a metade direita da tabela de técnicos. */
-const COL_TEC_DIR = 6;   // F
+/**
+ * Colunas onde começa cada uma das três tabelas de técnicos, coladas lado a
+ * lado (A, F, K), com E e J como separadores.
+ */
+const BLOCO_COL = [1, 6, 11];
 
 /** Colunas reservadas no resumo para os tipos distintos. */
 const N_COLUNAS_TIPO = 5;
@@ -120,7 +123,7 @@ function linhaCabecalho(ws, linha, valores, colInicial = 1) {
  *   RESUMO — uma coluna por indicador, duas linhas de valores:     <- linhas 3..6
  *            "Nº de Processos" e "Total das Taxas"; inclui o total,
  *            cada período, a atribuição, os estados e os tipos.
- *   TÉCNICOS [6] — 6 linhas à esquerda + 6 à direita               <- a partir da 8
+ *   TÉCNICOS [6] — três tabelas lado a lado, 8 linhas cada           <- a partir da 8
  *   DADOS — uma linha por processo                                 <- a partir da 19
  *
  * Só o resumo fica congelado (as suas duas linhas de valores mais o cabeçalho);
@@ -133,16 +136,19 @@ function linhaCabecalho(ws, linha, valores, colInicial = 1) {
  * @param {Array}  params.registos  [{periodo, dataReg, totalTaxas, numeroDU}]
  * @param {Array}  params.tecnicos  [{nome, tipo}] pré-preenchidos (pode ser [])
  * @param {string} params.estado    valor por omissão do campo Estado [4]
- * @param {number} params.linhasTecnicos nº total de linhas de técnicos (metade
- *                                       de cada lado)
+ * @param {number} params.linhasTecnicos nº de linhas de cada uma das três
+ *                                       tabelas de técnicos
  */
 function construirFolhaRelatorio(ws, params) {
   const { titulo, subtitulo, registos, tecnicos = [], estado = 'Pago' } = params;
 
-  // Técnicos: metade das linhas de cada lado.
-  const totalTec = Math.max(params.linhasTecnicos || 12, tecnicos.length, 2);
-  const metade = Math.ceil(totalTec / 2);
-  const nTec = metade * 2;
+  // Técnicos: três tabelas lado a lado, com o mesmo número de linhas cada.
+  const porTabela = Math.max(
+    params.linhasTecnicos || 8,
+    Math.ceil(tecnicos.length / BLOCO_COL.length),
+    1,
+  );
+  const nTec = porTabela * BLOCO_COL.length;
 
   const periodos = [...new Set(registos.map((r) => r.periodo).filter(Boolean))];
   // Estados possíveis: o valor por omissão mais os restantes da lista.
@@ -159,7 +165,7 @@ function construirFolhaRelatorio(ws, params) {
   const linhaTecTitulo = ultimaFixa + 2;
   const linhaTecCab = linhaTecTitulo + 1;
   const primTec = linhaTecCab + 1;
-  const ultTec = primTec + metade - 1;
+  const ultTec = primTec + porTabela - 1;
 
   const linhaDadosTitulo = ultTec + 2;
   const linhaDadosCab = linhaDadosTitulo + 1;
@@ -167,19 +173,24 @@ function construirFolhaRelatorio(ws, params) {
   const ultDados = primDados + Math.max(registos.length, 1) - 1;
 
   /* ---- Colunas ---------------------------------------------------- */
-  // As 8 primeiras servem a tabela de dados; as seguintes só o resumo.
+  // As 8 primeiras servem a tabela de dados; as três tabelas de técnicos
+  // ocupam até à coluna N (14). O mapa auxiliar escondido fica mais à direita.
   const nColResumo = 1 + 1 + periodos.length + 2 + estados.length + nTipos + 1;
-  const larguras = [24, 14, 18, 14, 14, 24, 16, 22];
-  while (larguras.length < nColResumo) larguras.push(13);
+  const nCol = Math.max(nColResumo, BLOCO_COL[2] + 3);        // até à última tabela
+  const colAux = Math.max(20, nColResumo + 3);               // mapa auxiliar (T…)
+
+  // A(nome1) B(tipo1) C(nº1) D(total1) E(sep) F(nome2) G(tipo2) H(nº2) I(total2)
+  // J(sep)   K(nome3) L(tipo3) M(nº3) N(total3)
+  const larguras = [22, 14, 18, 14, 13, 22, 14, 18, 16, 3, 22, 13, 16, 16];
+  while (larguras.length < colAux - 1) larguras.push(14);
   ws.columns = [
     ...larguras.map((width) => ({ width })),
-    ...Array.from({ length: COL_AUX - larguras.length - 1 }, () => ({ width: 9 })),
-    { width: 18 }, { width: 14 }, { width: 8 }, // área auxiliar
+    { width: 18 }, { width: 14 }, { width: 8 }, // área auxiliar (nome, tipo, ordem)
   ];
-  for (const c of [COL_AUX, COL_AUX + 1, COL_AUX + 2]) ws.getColumn(c).hidden = true;
+  for (const c of [colAux, colAux + 1, colAux + 2]) ws.getColumn(c).hidden = true;
 
   /* ---- Título ----------------------------------------------------- */
-  ws.mergeCells(1, 1, 1, nColResumo);
+  ws.mergeCells(1, 1, 1, nCol);
   const t = ws.getCell(1, 1);
   t.value = titulo;
   t.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
@@ -187,7 +198,7 @@ function construirFolhaRelatorio(ws, params) {
   t.alignment = { vertical: 'middle', horizontal: 'left' };
   ws.getRow(1).height = 24;
 
-  ws.mergeCells(2, 1, 2, nColResumo);
+  ws.mergeCells(2, 1, 2, nCol);
   const s = ws.getCell(2, 1);
   s.value = subtitulo;
   s.font = { size: 10, color: { argb: 'FF404040' } };
@@ -195,9 +206,19 @@ function construirFolhaRelatorio(ws, params) {
   ws.getRow(2).height = 26;
 
   /* Intervalos usados pelas fórmulas -------------------------------- */
-  const A = letraCol(COL_AUX);          // nomes (auxiliar)
-  const B = letraCol(COL_AUX + 1);      // tipos (auxiliar)
-  const C = letraCol(COL_AUX + 2);      // ordem do 1º aparecimento
+  const A = letraCol(colAux);          // nomes (auxiliar)
+  const B = letraCol(colAux + 1);      // tipos (auxiliar)
+  const C = letraCol(colAux + 2);      // ordem do 1º aparecimento
+
+  // Cada tabela de técnicos referida como intervalos (nome, tipo, nome:tipo).
+  // Referir sempre por INTERVALO — e nunca célula a célula — é o que permite
+  // inserir linhas dentro de uma tabela: o Excel estica o intervalo e as
+  // fórmulas continuam a apanhar a linha nova.
+  const colNomeBloco = (b) => letraCol(BLOCO_COL[b]);
+  const colTipoBloco = (b) => letraCol(BLOCO_COL[b] + 1);
+  const nomesBloco = (b) => `$${colNomeBloco(b)}$${primTec}:$${colNomeBloco(b)}$${ultTec}`;
+  const tiposBloco = (b) => `$${colTipoBloco(b)}$${primTec}:$${colTipoBloco(b)}$${ultTec}`;
+  const mapaBloco = (b) => `$${colNomeBloco(b)}$${primTec}:$${colTipoBloco(b)}$${ultTec}`;
 
   const R = {
     periodo: `$A$${primDados}:$A$${ultDados}`,
@@ -206,23 +227,24 @@ function construirFolhaRelatorio(ws, params) {
     du: `$E$${primDados}:$E$${ultDados}`,
     tecnico: `$F$${primDados}:$F$${ultDados}`,
     tipo: `$G$${primDados}:$G$${ultDados}`,
-    mapa: `$${A}$1:$${B}$${nTec}`,
     mapaNomes: `$${A}$1:$${A}$${nTec}`,
     mapaTipos: `$${B}$1:$${B}$${nTec}`,
     mapaOrdem: `$${C}$1:$${C}$${nTec}`,
   };
 
-  /* ---- Área auxiliar (escondida): junta os dois lados num só mapa -- */
+  /* ---- Área auxiliar (escondida): junta as três tabelas num só mapa -
+   * Cada célula vai buscar o j-ésimo técnico de uma tabela por INDEX sobre o
+   * intervalo da tabela — assim o mapa acompanha as linhas inseridas. */
+  const semZero = (formula) => `IFERROR(IF(${formula}="","",${formula}),"")`;
   for (let i = 0; i < nTec; i++) {
     const r = 1 + i;
-    const rMapa = primTec + (i % metade);
-    const colNome = i < metade ? 'A' : letraCol(COL_TEC_DIR);
-    const colTipo = i < metade ? 'B' : letraCol(COL_TEC_DIR + 1);
+    const b = Math.floor(i / porTabela);
+    const j = (i % porTabela) + 1;
     const row = ws.getRow(r);
-    row.getCell(COL_AUX).value = { formula: `IF($${colNome}${rMapa}="","",$${colNome}${rMapa})` };
-    row.getCell(COL_AUX + 1).value = { formula: `IF($${colTipo}${rMapa}="","",$${colTipo}${rMapa})` };
+    row.getCell(colAux).value = { formula: semZero(`INDEX(${nomesBloco(b)},${j})`) };
+    row.getCell(colAux + 1).value = { formula: semZero(`INDEX(${tiposBloco(b)},${j})`) };
     // Numera cada tipo na 1ª vez que aparece, para a lista de tipos distintos.
-    row.getCell(COL_AUX + 2).value = {
+    row.getCell(colAux + 2).value = {
       formula: i === 0
         ? `IF($${B}${r}="","",1)`
         : `IF($${B}${r}="","",IF(COUNTIF($${B}$1:$${B}${r},$${B}${r})=1,`
@@ -236,7 +258,7 @@ function construirFolhaRelatorio(ws, params) {
     linhaResumoTitulo,
     'RESUMO',
     'sempre à vista — acompanha o preenchimento da tabela de dados',
-    nColResumo
+    nCol
   );
 
   const colunas = [];
@@ -346,42 +368,40 @@ function construirFolhaRelatorio(ws, params) {
     aplicarBorda(ws.getRow(r), 1, 1 + colunas.length);
   }
 
-  /* ---- Técnicos: metade das linhas de cada lado ------------------- */
+  /* ---- Técnicos: três tabelas coladas lado a lado ----------------- */
   tituloSeccao(
     ws,
     linhaTecTitulo,
     'TÉCNICOS [6] — DEFINIR O TIPO [7] DE CADA UM',
-    'escreva o nome e o tipo nas células amarelas; na tabela de dados basta escolher '
-      + 'o técnico e o tipo aparece sozinho',
-    nColResumo
+    'escreva o nome e o tipo nas células amarelas; pode inserir linhas dentro de '
+      + 'qualquer tabela — as contagens e o tipo continuam certos',
+    nCol
   );
-  linhaCabecalho(ws, linhaTecCab, ['Técnico [6]', 'Tipo [7]', 'Nº de Processos', 'Total das Taxas']);
-  linhaCabecalho(
-    ws, linhaTecCab, ['Técnico [6]', 'Tipo [7]', 'Nº de Processos', 'Total das Taxas'], COL_TEC_DIR
-  );
+  const cabTecnicos = ['Técnico [6]', 'Tipo [7]', 'Nº de Processos', 'Total das Taxas'];
+  for (const col of BLOCO_COL) linhaCabecalho(ws, linhaTecCab, cabTecnicos, col);
 
-  for (let i = 0; i < metade; i++) {
+  for (let i = 0; i < porTabela; i++) {
     const r = primTec + i;
     const row = ws.getRow(r);
 
-    [{ col: 1, cfg: tecnicos[i] }, { col: COL_TEC_DIR, cfg: tecnicos[metade + i] }]
-      .forEach(({ col, cfg }) => {
-        const letra = letraCol(col);
-        row.getCell(col).value = cfg ? cfg.nome : null;
-        row.getCell(col + 1).value = cfg ? cfg.tipo : null;
-        for (const c of [col, col + 1]) {
-          row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_INPUT } };
-        }
-        row.getCell(col + 2).value = {
-          formula: `IF($${letra}${r}="","",COUNTIF(${R.tecnico},$${letra}${r}))`,
-        };
-        row.getCell(col + 3).value = {
-          formula: `IF($${letra}${r}="","",SUMIF(${R.tecnico},$${letra}${r},${R.total}))`,
-        };
-        row.getCell(col + 2).numFmt = FMT_NUMERO;
-        row.getCell(col + 3).numFmt = FMT_NUMERO;
-        aplicarBorda(row, col, col + 3);
-      });
+    BLOCO_COL.forEach((col, b) => {
+      const cfg = tecnicos[b * porTabela + i];
+      const letra = letraCol(col);
+      row.getCell(col).value = cfg ? cfg.nome : null;
+      row.getCell(col + 1).value = cfg ? cfg.tipo : null;
+      for (const c of [col, col + 1]) {
+        row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_INPUT } };
+      }
+      row.getCell(col + 2).value = {
+        formula: `IF($${letra}${r}="","",COUNTIF(${R.tecnico},$${letra}${r}))`,
+      };
+      row.getCell(col + 3).value = {
+        formula: `IF($${letra}${r}="","",SUMIF(${R.tecnico},$${letra}${r},${R.total}))`,
+      };
+      row.getCell(col + 2).numFmt = FMT_NUMERO;
+      row.getCell(col + 3).numFmt = FMT_NUMERO;
+      aplicarBorda(row, col, col + 3);
+    });
   }
 
   /* ---- Dados ------------------------------------------------------ */
@@ -391,7 +411,7 @@ function construirFolhaRelatorio(ws, params) {
     'DADOS',
     'uma linha por processo extraído dos PDFs; indique o técnico responsável em cada '
       + 'linha — a última coluna mostra de que PDF veio',
-    nColResumo
+    nCol
   );
   linhaCabecalho(ws, linhaDadosCab, [...COLUNAS, COLUNA_ORIGEM]);
 
@@ -417,8 +437,11 @@ function construirFolhaRelatorio(ws, params) {
     // um relatório anterior.
     row.getCell(6).value = reg.tecnico || null;
     row.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COR_INPUT } };
+    // Tipo procurado nas três tabelas, uma a seguir à outra; como cada uma é
+    // um intervalo, inserir linhas numa tabela não parte esta procura.
+    const proc = (b) => `VLOOKUP($F${r},${mapaBloco(b)},2,FALSE)`;
     row.getCell(7).value = {
-      formula: `IF($F${r}="","",IFERROR(VLOOKUP($F${r},${R.mapa},2,FALSE),""))`,
+      formula: `IF($F${r}="","",IFERROR(${proc(0)},IFERROR(${proc(1)},IFERROR(${proc(2)},""))))`,
     };
     row.getCell(8).value = reg.ficheiro || '';
     row.getCell(8).font = { size: 9, color: { argb: 'FF595959' } };
@@ -461,7 +484,7 @@ function construirFolhaRelatorio(ws, params) {
   return {
     linhaResumoTitulo, linhaResumoCab, linhaResumoN, linhaResumoT, ultimaFixa,
     linhaTecTitulo, linhaTecCab, linhaDadosTitulo, linhaDadosCab,
-    primDados, ultDados, primTec, ultTec, metade,
+    primDados, ultDados, primTec, ultTec, porTabela,
   };
 }
 
@@ -607,7 +630,7 @@ export async function criarWorkbook(ExcelJS, grupo, opcoes = {}) {
     registos,
     tecnicos: opcoes.tecnicos || [],
     estado: opcoes.estado || 'Pago',
-    linhasTecnicos: opcoes.linhasTecnicos || 12,
+    linhasTecnicos: opcoes.linhasTecnicos || 8,
   });
 
   construirFolhaOrigem(wb.addWorksheet('Ficheiros de Origem'), grupo.ficheiros);

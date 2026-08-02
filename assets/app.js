@@ -583,7 +583,7 @@ async function gerar() {
   const opcoes = {
     tecnicos: tecnicosParaOsFicheiros(),
     estado: $('estado').value.trim() || 'Pago',
-    linhasTecnicos: Math.max(2, Number($('linhas-tecnicos').value) || 12),
+    linhasTecnicos: Math.max(2, Number($('linhas-tecnicos').value) || 8),
   };
 
   try {

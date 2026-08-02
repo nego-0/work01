@@ -23,8 +23,8 @@
  *      agregações nem repetições, e cada linha identifica o PDF de origem.
  *   9. O resumo cabe em duas linhas (nº de processos e total das taxas), com uma
  *      coluna por indicador — total, períodos, atribuição, estados e tipos — e é
- *      a única parte congelada da folha; a tabela de técnicos tem metade das
- *      linhas de cada lado.
+ *      a única parte congelada da folha; os técnicos ocupam três tabelas
+ *      coladas lado a lado.
  *  10. Os grupos de 3 dias cobrem cada ficheiro exactamente uma vez, e o modo de
  *      um ficheiro por dia dá um grupo por cada dia.
  *  11. Um relatório preenchido com técnicos pode ser relido sem perder nada:
@@ -301,14 +301,40 @@ for (const g of [...grupos, { datas: [], ficheiros, rotulo: 'Consolidado', conso
     'painel inferior começa abaixo da zona congelada',
     `activeCell=${vista.activeCell} topLeftCell=${vista.topLeftCell}`);
 
-  // tabela de técnicos com metade das linhas de cada lado
+  // três tabelas de técnicos coladas lado a lado (A, F, K)
   let linhaTec = 0;
   for (let r = 1; r < linhaCab; r++) {
     if (ws.getCell(r, 1).value === 'Técnico [6]') { linhaTec = r; break; }
   }
   verificar(linhaTec > 0, 'tabela de técnicos encontrada');
-  verificar(ws.getCell(linhaTec, 6).value === 'Técnico [6]',
-    'técnicos com uma metade de cada lado', String(ws.getCell(linhaTec, 6).value));
+  verificar(
+    [1, 6, 11].every((c) => ws.getCell(linhaTec, c).value === 'Técnico [6]'),
+    'três tabelas de técnicos lado a lado (A, F, K)',
+    [1, 6, 11].map((c) => ws.getCell(linhaTec, c).value).join(' | ')
+  );
+
+  // o Tipo procura o técnico nas três tabelas por INTERVALO — é isto que deixa
+  // inserir linhas nas tabelas sem partir a lógica.
+  const fTipo = String((ws.getCell(linhaCab + 1, 7).value || {}).formula || '');
+  verificar(
+    (fTipo.match(/VLOOKUP/g) || []).length === 3
+      && /\$A\$\d+:\$B\$\d+/.test(fTipo)
+      && /\$F\$\d+:\$G\$\d+/.test(fTipo)
+      && /\$K\$\d+:\$L\$\d+/.test(fTipo),
+    'Tipo procurado nas três tabelas por intervalo', fTipo
+  );
+
+  // as contagens por técnico usam o mesmo intervalo de dados nas três tabelas,
+  // por isso nenhum processo pode ser contado a dois técnicos.
+  const rangesTec = new Set();
+  for (const c of [1, 6, 11]) {
+    const f = String((ws.getCell(linhaTec + 1, c + 2).value || {}).formula || '');
+    const m = f.match(/COUNTIF\((\$F\$\d+:\$F\$\d+)/);
+    if (m) rangesTec.add(m[1]);
+  }
+  verificar(rangesTec.size === 1,
+    'as três tabelas contam sobre o mesmo intervalo de dados',
+    [...rangesTec].join(' / '));
 
   /* ---- 11 — ida e volta: preencher e reler ------------------------ */
   {
@@ -323,12 +349,14 @@ for (const g of [...grupos, { datas: [], ficheiros, rotulo: 'Consolidado', conso
     folha.getCell(rTec, 2).value = 'A';
     folha.getCell(rTec, 6).value = 'Ana';
     folha.getCell(rTec, 7).value = 'B';
+    folha.getCell(rTec, 11).value = 'Rui';
+    folha.getCell(rTec, 12).value = 'C';
 
-    const equipa = ['João', 'Ana'];
+    const equipa = ['João', 'Ana', 'Rui'];
     let i = 0;
     for (let r = linhaCab + 1; r <= folha.rowCount; r++) {
       if (folha.getCell(r, 5).value === null || folha.getCell(r, 5).value === undefined) continue;
-      folha.getCell(r, 6).value = equipa[i % 2];
+      folha.getCell(r, 6).value = equipa[i % 3];
       if (i % 3 === 0) folha.getCell(r, 4).value = 'Não Pago';
       i++;
     }
@@ -341,15 +369,17 @@ for (const g of [...grupos, { datas: [], ficheiros, rotulo: 'Consolidado', conso
       relido.registos.every((r, k) => r.numeroDU === lidos[k].du),
       'ordem preservada ao reler o relatório'
     );
-    verificar(relido.tecnicos.length === 2
+    verificar(relido.tecnicos.length === 3
       && relido.tecnicos.some((t) => t.nome === 'João' && t.tipo === 'A')
-      && relido.tecnicos.some((t) => t.nome === 'Ana' && t.tipo === 'B'),
-    'mapa de técnicos relido das duas metades',
+      && relido.tecnicos.some((t) => t.nome === 'Ana' && t.tipo === 'B')
+      && relido.tecnicos.some((t) => t.nome === 'Rui' && t.tipo === 'C'),
+    'mapa de técnicos relido das três tabelas',
     relido.tecnicos.map((t) => `${t.nome}=${t.tipo}`).join(', '));
-    verificar(relido.registos.every((r) => r.tecnico === 'João' || r.tecnico === 'Ana'),
+    verificar(relido.registos.every((r) => ['João', 'Ana', 'Rui'].includes(r.tecnico)),
       'técnico de cada linha preservado');
+    const tipoEsperado = { João: 'A', Ana: 'B', Rui: 'C' };
     verificar(
-      relido.registos.every((r) => r.tipo === (r.tecnico === 'João' ? 'A' : 'B')),
+      relido.registos.every((r) => r.tipo === tipoEsperado[r.tecnico]),
       'tipo recalculado a partir do técnico'
     );
     verificar(relido.registos.filter((r) => r.estado === 'Não Pago').length === Math.ceil(lidos.length / 3),
