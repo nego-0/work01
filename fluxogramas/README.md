@@ -34,6 +34,7 @@ por baixo da piscina.
 | `08-emissao-de-notas-de-pagamento.drawio` | Emissão de notas de pagamento |
 | `09-mercadorias-restritas-e-perigosas.drawio` | Controlo de entrada e saída de mercadorias restritas e perigosas |
 | `10-inspeccao-fisica-scanner-divisas.drawio` | Inspeção física e scanner das mercadorias, divisas e passageiros |
+| `fluxogramas-editaveis.xlsx` | **Versão editável em Excel** — grelha de raias, tabela de sequência e **setas reais (Formas)** ligando os passos |
 
 ## Fluxograma geral integrado
 
