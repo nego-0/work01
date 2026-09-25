@@ -4,3 +4,6 @@ saida/
 *.xlsx
 .testpdfs/
 .DS_Store
+
+# Excepcao: os fluxogramas em Excel sao entregaveis (nao sao output da app)
+!fluxogramas/*.xlsx
